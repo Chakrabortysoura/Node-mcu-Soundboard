@@ -1,3 +1,6 @@
 valgrind.*
 .idea
 .vscode
+.cache/*
+debug_logs.txt
+bin/*
