@@ -9,19 +9,8 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/error.h>
-
-void free_av_objects(AVFormatContext **fileformatctx, AVPacket **datapacket, AVFrame **dataframe, AVCodecContext ***streamcodectx){
-  //Cleanup all the allocated objects before exiting the programme
-  for(int i=0;i<(*fileformatctx)->nb_streams;i++){
-    avcodec_free_context(*(streamcodectx)+i); //free inividual codectx from the array before cleaning the whole array
-  }
-  free((*streamcodectx));
-  av_frame_free(dataframe);
-  av_packet_free(datapacket);
-  avformat_close_input(fileformatctx);
-
-  fprintf(stderr, "---------------\n");
-}
+#include <dirent.h>
+#include "audio.h"
 
 int main(const int argc, char  *argv[]){
   if (argc<2){
@@ -105,5 +94,10 @@ int main(const int argc, char  *argv[]){
   fprintf(stderr, "Tota number of frames decoded: %d\n", i);
 
   free_av_objects(&fileformatctx, &datapacket, &dataframe, &streamcodectx);
+
+  DIRENTRY *results=calloc(1,sizeof(DIRENTRY));
+  int8_t no_of_entry=read_dir_contents("/home/souranil/Source_Code/C/Soundboard/", results);
+  fprintf(stderr, "Number of elements/entries in the directory: %d\n", no_of_entry);
+
   return 0;
 }
