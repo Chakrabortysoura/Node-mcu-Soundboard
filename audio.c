@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 
 void free_av_objects(AVFormatContext **fileformatctx, AVPacket **datapacket, AVFrame **dataframe, AVCodecContext ***streamcodectx){
   //Cleanup all the allocated objects before exiting the programme
@@ -22,7 +23,7 @@ void free_av_objects(AVFormatContext **fileformatctx, AVPacket **datapacket, AVF
   fprintf(stderr, "---------------\n");
 }
 
-int8_t read_dir_contents(const char *dirname, DIRENTRY *contents /* This value should be passed as not initiated */){
+DIRENT * read_dir_contents(const char *dirname){
   DIR *directory;
   if((directory=opendir(dirname))==NULL){
     switch(errno){
@@ -33,42 +34,47 @@ int8_t read_dir_contents(const char *dirname, DIRENTRY *contents /* This value s
       case ENOMEM: fprintf(stderr, "Unable to open the audio directory :%s => Permission denied\n", dirname);
                    break;
     }
-    return -1;
+    return nullptr;
   }
   
-  contents->count=0;
-  errno=0;
-  fprintf(stderr, "The directory contents from the DIR stream=>\n");
-  for(contents->count=0; errno==0;contents->count++){
-    struct dirent *dircontents= readdir(directory);
-    if (errno==0){
-      fprintf(stderr, "%s\n", dircontents->d_name);
-      
-      if(contents->direntrynames==NULL){
-        contents->direntrynames=calloc(256, sizeof(char));
-      }else{
-        contents->direntrynames=realloc(contents->direntrynames, (contents->count+1)*256*sizeof(char));
-      }
-      (contents->direntrynames)=strcpy(contents->direntrynames+(contents->count*256), dircontents->d_name);
-      contents->count++;
-    }else{
-      fprintf(stderr, "Error code: %s\n", strerror(errno));
+  DIRENT *result=calloc(1, sizeof(DIRENT));
+  struct dirent *content;
+
+  while((content=readdir(directory))){
+    if (strcmp(content->d_name, ".")==0 || strcmp(content->d_name, "..")==0){ // Ignore . and .. entries in a unix directory
+      continue;
     }
+    
+    if(result->entry_names==NULL){
+      result->entry_names=calloc(result->count+1, sizeof(char *));
+      if (!result->entry_names){
+        fprintf(stderr, "Error allocating memory for the result buffer\n");
+        break;
+      }
+    }else{
+      result->entry_names=reallocarray(result->entry_names, result->count+1, sizeof(char *));
+      if (!result->entry_names){
+        fprintf(stderr, "Error allocating more memory for the result buffer\n");
+        break;
+      }
+    }
+    result->entry_names[result->count]=calloc(strlen(content->d_name), sizeof(char));
+    if (result->entry_names[result->count]==NULL){
+      break;
+    }
+    strcpy(result->entry_names[result->count], content->d_name);
+    result->count+=1;
   }
 
-  //print out the names stored in the direntryname
-  fprintf(stderr, "The directory contents=>\n");
-  for(int i=0;i<sizeof(contents->direntrynames);i++){
-    if (contents->direntrynames[i]=='\0'){
-      fprintf(stderr, "\n");
-    }else{
-      fprintf(stderr, "%c\n", contents->direntrynames[i]);
-    }
-  }
-  
-  return contents->count;
+  closedir(directory);
+  fprintf(stderr, "Total length of the resulting array containing all the directory names: %d\n", result->count);
+  return result;//Return the char buffer containing all the names of the directory entire seperated by newline
 }
 
-void init_audio(char *dir){
-
+void free_direntry_obj(DIRENT **obj){
+  for(int i=0;i<(*obj)->count;i++){
+    free((*obj)->entry_names[i]);
+  }
+  free((*obj)->entry_names);
+  free(*obj);
 }

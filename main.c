@@ -92,12 +92,14 @@ int main(const int argc, char  *argv[]){
     fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  argv[1], demuxerr);
   }
   fprintf(stderr, "Tota number of frames decoded: %d\n", i);
-
   free_av_objects(&fileformatctx, &datapacket, &dataframe, &streamcodectx);
 
-  DIRENTRY *results=calloc(1,sizeof(DIRENTRY));
-  int8_t no_of_entry=read_dir_contents("/home/souranil/Source_Code/C/Soundboard/", results);
-  fprintf(stderr, "Number of elements/entries in the directory: %d\n", no_of_entry);
+  DIRENT *dir_entry=read_dir_contents("/home/souranil/Source_Code/C/Soundboard/");
+  fprintf(stderr, "Number of entries in the directory: %d\nDirectory entries=>\n", dir_entry->count);
+  for(int i=0;i<dir_entry->count;i++){
+    fprintf(stderr, "%s\n", dir_entry->entry_names[i]);
+  }
+  free_direntry_obj(&dir_entry);
 
   return 0;
 }

@@ -8,15 +8,13 @@
 
 extern void free_av_objects(AVFormatContext **fileformatctx, AVPacket **datapacket, AVFrame **dataframe, AVCodecContext ***streamcodectx);
 
-typedef struct direntry{ 
-	/* 
-	 * A wrapper struct around a char buffer to store the names 
-	 * of the directory entries and keeps a count of the total number of directory entries
-	*/
-	char *direntrynames;
-	int8_t count;
-}DIRENTRY;
+typedef struct dir_entry_names{
+	char **entry_names;
+	int count;
+}DIRENT;
 
-extern int8_t read_dir_contents(const char *dirname, DIRENTRY *contents);
+extern DIRENT * read_dir_contents(const char *dirname);
+
+extern void free_direntry_obj(DIRENT **obj);
 
 #endif
