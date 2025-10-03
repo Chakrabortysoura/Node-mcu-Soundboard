@@ -10,7 +10,8 @@ private:
 	std::string port;
 	struct termios serial_port_config;
 	int port_fd;
+	int8_t buffer;
 public: 
 	Serial_port(const std::string port_name);
-	int8_t Read(const int8_t n_bytes=0);
+	int8_t Read();
 };
