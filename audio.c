@@ -1,14 +1,13 @@
-/*
-* This file contains all the audio playback related functionalities
-*/
+//
+// Created by souranil on 7/22/25.
+//
 #define _GNU_SOURCE
 #include "audio.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <dirent.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 
 void free_av_objects(AVFormatContext **fileformatctx, AVPacket **datapacket, AVFrame **dataframe, AVCodecContext ***streamcodectx){
   //Cleanup all the allocated objects before exiting the programme
@@ -23,58 +22,89 @@ void free_av_objects(AVFormatContext **fileformatctx, AVPacket **datapacket, AVF
   fprintf(stderr, "---------------\n");
 }
 
-DIRENT * read_dir_contents(const char *dirname){
-  DIR *directory;
-  if((directory=opendir(dirname))==NULL){
-    switch(errno){
-      case EACCES: fprintf(stderr, "Unable to open the audio directory :%s => Permission denied\n", dirname);
-                   break;
-      case EMFILE: fprintf(stderr, "Unable to open the audio directory :%s => Permission denied\n", dirname);
-                   break;
-      case ENOMEM: fprintf(stderr, "Unable to open the audio directory :%s => Permission denied\n", dirname);
-                   break;
-    }
-    return nullptr;
-  }
-  
-  DIRENT *result=calloc(1, sizeof(DIRENT));
-  struct dirent *content;
+int play(char *target_track_path){
+  /*
+    * This function expeects a track number to play and all the tracks are to labelled as numbers in the 
+    * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
+  */
 
-  while((content=readdir(directory))){
-    if (strcmp(content->d_name, ".")==0 || strcmp(content->d_name, "..")==0){ // Ignore . and .. entries in a unix directory
+  //char target_track_path[256];
+//if (sprintf(target_track_path, "~/Music/%s",track_name)<0){
+  //fprintf(stderr, "Error in storing the absolute path to the traget track\n");
+  //}
+  fprintf(stderr, "Track path: %s\n", target_track_path);
+  AVFormatContext *fileformatctx=avformat_alloc_context();
+  if(avformat_open_input(&fileformatctx, target_track_path, NULL, NULL)!=0){
+    fprintf(stderr, "Unable to open the requested file: %s\n", strerror(errno));
+    avformat_free_context(fileformatctx);
+    return -1;
+  }
+  if(avformat_find_stream_info(fileformatctx, NULL)<0){
+    fprintf(stderr, "Unable to obtain stream info: %s\n", strerror(errno));
+    avformat_free_context(fileformatctx);
+    return -1;
+  }
+  fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
+
+  //Starting to inspect and attempt to decode each individual stream in the given file
+  fprintf(stderr, "Trying to obtain stream information from the File=>\n");
+  AVCodecContext **streamcodectx=calloc(fileformatctx->nb_streams ,sizeof(AVCodecContext));
+  if (streamcodectx==NULL) {
+    fprintf(stderr, "Unable to allocation codectx of the required space for the track\n");
+    return -1;
+  }
+
+  for(int i=0;i<fileformatctx->nb_streams;i++){
+    if((streamcodectx[i]=avcodec_alloc_context3(NULL))==NULL){ // Initialize individual each elements in the array 
+      fprintf(stderr, "Failed to allocate for stream details.\nFile: %s Stream no: %d\n", target_track_path, i+1);
+      continue;
+    }
+    // Obtain decoder and details about all streams in the file and store those context in the streamcodectx array
+    if(avcodec_open2(streamcodectx[i], avcodec_find_decoder(fileformatctx->streams[i]->codecpar->codec_id), NULL)!=0){
+      fprintf(stderr, "Unable to get the decoder for the stream type\n");
       continue;
     }
     
-    if(result->entry_names==NULL){
-      result->entry_names=calloc(result->count+1, sizeof(char *));
-      if (!result->entry_names){
-        fprintf(stderr, "Error allocating memory for the result buffer\n");
-        break;
+    fprintf(stderr, "Stream Info\n Stream number: %d\n", i+1);
+    switch(streamcodectx[i]->codec->type){
+      case AVMEDIA_TYPE_AUDIO: fprintf(stderr, " Type: Audio, Codec: %s\n", streamcodectx[i]->codec->long_name);
+                               break;
+      case AVMEDIA_TYPE_VIDEO: fprintf(stderr, " Type: Video, Codec: %s\n", streamcodectx[i]->codec->long_name);
+                               break;
+      case AVMEDIA_TYPE_SUBTITLE: fprintf(stderr, " Type: Subtitle, Codec: %s\n", streamcodectx[i]->codec->long_name);
+                                  break;
+      default: fprintf(stderr, "Unknown codec type\n");
+    }
+  }  
+  
+  //Try to read just one packet from the file and decode that packet to a valid frame
+  AVPacket *datapacket=av_packet_alloc();
+  AVFrame *dataframe=av_frame_alloc();
+  int demuxerr, decoderr, i=0;
+
+  while((demuxerr=av_read_frame(fileformatctx, datapacket))==0){
+    //Feed the decoder a packet 
+    if((decoderr=avcodec_send_packet(streamcodectx[datapacket->stream_index], datapacket))==0){
+      //Retrieving decoded frames from the decoder till the decoder buff is not empty
+      while((decoderr=avcodec_receive_frame(streamcodectx[datapacket->stream_index], dataframe))==0){
+        i++;
+        av_frame_unref(dataframe);// clean the frame after use
       }
+    }else if(AVERROR(EINVAL)){
+      fprintf(stderr, "Codec not opened.\n");
     }else{
-      result->entry_names=reallocarray(result->entry_names, result->count+1, sizeof(char *));
-      if (!result->entry_names){
-        fprintf(stderr, "Error allocating more memory for the result buffer\n");
-        break;
-      }
+      fprintf(stderr, "Unknown error sending packets to the decoder.\n");
     }
-    result->entry_names[result->count]=calloc(strlen(content->d_name), sizeof(char));
-    if (result->entry_names[result->count]==NULL){
-      break;
-    }
-    strcpy(result->entry_names[result->count], content->d_name);
-    result->count+=1;
+    av_packet_unref(datapacket);// clean the packet after use
   }
 
-  closedir(directory);
-  fprintf(stderr, "Total length of the resulting array containing all the directory names: %d\n", result->count);
-  return result;//Return the char buffer containing all the names of the directory entire seperated by newline
-}
-
-void free_direntry_obj(DIRENT **obj){
-  for(int i=0;i<(*obj)->count;i++){
-    free((*obj)->entry_names[i]);
+  if (demuxerr==AVERROR_EOF){
+    fprintf(stderr, "End of File reached: %s\n", target_track_path);
+  }else{
+    fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, demuxerr);
   }
-  free((*obj)->entry_names);
-  free(*obj);
+  fprintf(stderr, "Tota number of frames decoded: %d\n", i);
+  free_av_objects(&fileformatctx, &datapacket, &dataframe, &streamcodectx);
+
+  return 0;
 }
