@@ -4,25 +4,44 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <pthread.h>
 #include "audio.h"
 
 int main(int argc, char  *argv[]){
-  char *track_name;
-  if (argc<2){
-    fprintf(stderr, "Provide track name to test :");
-    track_name=calloc(256, sizeof(char));
-    if (track_name==NULL){
-      fprintf(stderr, "Error in calloc\n");
-      return 1;
+  if (chdir("/home/souranil/")!=0){ //Always start at the users home directoryf;
+    fprintf(stderr, "Error in changing the base directory: %s\n", strerror(errno));
+    return 1;
+  }
+  char buffer[800];
+  fprintf(stderr, "Currect directory: %s\n", getcwd(buffer, sizeof(buffer)));
+
+  char *track_name=calloc(256, sizeof(char));
+  if (track_name==NULL){
+    fprintf(stderr, "Initial allocation for input buffer failed\n");
+    return 1;
+  }
+  //pthread_t audio_thread;
+  init_av_objects(); // Initialize the objects for the package of the audio header package
+
+  while (true){
+    fprintf(stderr, "Track path: ");
+    if ((fgets_unlocked(track_name, 256, stdin))==NULL){
+      fprintf(stderr, "Failed to take input\n");
+      continue;
+    }else{
+      track_name[strcspn(track_name, "\n")]='\0';
     }
-    scanf("%s", track_name); 
-  }else{
-    track_name=argv[1];
+    if (strcmp(track_name, "Q")==0 || strcmp(track_name, "q")==0){
+      fprintf(stderr, "Exiting the programme\n");
+      break;
+    }
+    play(track_name);
   }
-  if(play(track_name)==0){
-    fprintf(stderr, "Success in reading and decoding the whole file\n");
-  }else{
-    fprintf(stderr, "Failure in reading and decoding the whole file\n");
-  }
+
+  free(track_name);
+  free_av_objects(); //free all the objects from the audio package 
   return 0;
 }
