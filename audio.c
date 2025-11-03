@@ -7,10 +7,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-AVPacket *datapacket;
-AVFrame *dataframe;
-AVFormatContext *fileformatctx;
-AVCodecContext **streamcodectx;
+AVPacket *datapacket; // Package level datapacket to use when demuxign a particular fileformatctx.
+AVFrame *dataframe; // Package level dataframe to use when decoding from previously obtained data packets.
+AVFormatContext *fileformatctx; // Package level fileformatctx. This holds the info of the file that is being currently being played.
+AVCodecContext **streamcodectx; // Package level streamcodectx object array. Allocation and deallocation of this happens inside the play function. This buffer is 
+// allocated with streamcodectx->nb_streams properties. 
+
+void free_av_objects(){
+  //Cleanup all the allocated objects before exiting the programme
+  av_frame_free(&dataframe);
+  av_packet_free(&datapacket);
+  avformat_close_input(&fileformatctx);
+}
 
 int init_av_objects(){
   /*
@@ -23,19 +31,18 @@ int init_av_objects(){
   }
   if ((datapacket=av_packet_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
+    av_frame_free(&dataframe);
+    free_av_objects();
     exit(1);
   }
   if ((fileformatctx=avformat_alloc_context())==NULL){
     fprintf(stderr, "Unable to allocate file format ctx object.\n");
+    av_frame_free(&dataframe);
+    av_packet_free(&datapacket);
+    free_av_objects();
+    exit(1);
   }
   return 0;
-}
-
-void free_av_objects(){
-  //Cleanup all the allocated objects before exiting the programme
-  av_frame_free(&dataframe);
-  av_packet_free(&datapacket);
-  avformat_close_input(&fileformatctx);
 }
 
 int play(char *target_track_path){
@@ -114,10 +121,10 @@ int play(char *target_track_path){
   }
   fprintf(stderr, "Total number of frames decoded: %d\n", i);
 
-  //for(int i=0;i<fileformatctx->nb_streams;i++){
-    //avcodec_free_context(streamcodectx+i); //free inividual codectx from the array before cleaning the whole array
-  //}
-  //free(streamcodectx); // Free the whole buffer allocated for the all the streamcodectx objects
+  for(int i=0;i<fileformatctx->nb_streams;i++){
+    avcodec_free_context(streamcodectx+i); //free inividual codectx from the array before cleaning the whole array
+  }
+  free(streamcodectx); // Free the whole buffer allocated for the all the streamcodectx objects
 
   return 0;
 }
