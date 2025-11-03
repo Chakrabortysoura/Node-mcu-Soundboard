@@ -13,13 +13,6 @@ AVFormatContext *fileformatctx; // Package level fileformatctx. This holds the i
 AVCodecContext **streamcodectx; // Package level streamcodectx object array. Allocation and deallocation of this happens inside the play function. This buffer is 
 // allocated with streamcodectx->nb_streams properties. 
 
-void free_av_objects(){
-  //Cleanup all the allocated objects before exiting the programme
-  av_frame_free(&dataframe);
-  av_packet_free(&datapacket);
-  avformat_close_input(&fileformatctx);
-}
-
 int init_av_objects(){
   /*
    * Initializes the objects needed for audio demuxing and playback. This function returns 0 if succesfull or 
@@ -32,17 +25,22 @@ int init_av_objects(){
   if ((datapacket=av_packet_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
     av_frame_free(&dataframe);
-    free_av_objects();
     exit(1);
   }
   if ((fileformatctx=avformat_alloc_context())==NULL){
     fprintf(stderr, "Unable to allocate file format ctx object.\n");
     av_frame_free(&dataframe);
     av_packet_free(&datapacket);
-    free_av_objects();
     exit(1);
   }
   return 0;
+}
+
+void free_av_objects(){
+  //Cleanup all the allocated objects before exiting the programme
+  av_frame_free(&dataframe);
+  av_packet_free(&datapacket);
+  avformat_close_input(&fileformatctx);
 }
 
 int play(char *target_track_path){
