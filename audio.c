@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 
 AVPacket *datapacket; // Package level datapacket to use when demuxign a particular fileformatctx.
 AVFrame *dataframe; // Package level dataframe to use when decoding from previously obtained data packets.
