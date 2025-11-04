@@ -40,15 +40,19 @@ int play(char *target_track_path){
     * This function expeects a path to a audio track to play and all the tracks are to labelled as numbers in the 
     * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
   */
+  if (datapacket==NULL || dataframe==NULL){
+    fprintf(stderr, "Some internal package level objects are not initialized. You may want to call init_av_objects() function.\n");
+    return -1;
+  }
+  
   AVFormatContext *fileformatctx;
   if ((fileformatctx=avformat_alloc_context())==NULL){
-    fprintf(stderr, "Unable to allocate file format ctx object.\n");
+    fprintf(stderr, "Unable to allocate file format ctx object. Aborting the programme.\n");
     av_frame_free(&dataframe);
     av_packet_free(&datapacket);
     exit(1);
   }
 
-  fprintf(stderr, "Track path given to the play function: %s\n", target_track_path);
   if(avformat_open_input(&fileformatctx, target_track_path, NULL, NULL)!=0){
     fprintf(stderr, "Unable to open the requested file: %s\n", strerror(errno));
     avformat_free_context(fileformatctx);
