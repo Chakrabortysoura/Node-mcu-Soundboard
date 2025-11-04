@@ -11,8 +11,8 @@
 #include "audio.h"
 
 int main(int argc, char  *argv[]){
-  int total_track_numbre=6;
-  if (arg==2){ // If the user provides a specific number of tracks that will be mapped to soundboard serial input otherwise defaults to the basic 6 inputs for nodemcu. 
+  int total_track_number=6;
+  if (argc==2){ // If the user provides a specific number of tracks that will be mapped to soundboard serial input otherwise defaults to the basic 6 inputs for nodemcu. 
     total_track_number=atoi(argv[1]);
   }
   
@@ -23,30 +23,16 @@ int main(int argc, char  *argv[]){
   char buffer[800];
   fprintf(stderr, "Currect directory: %s\n", getcwd(buffer, sizeof(buffer)));
 
-  char *track_name=calloc(256, sizeof(char));
-  if (track_name==NULL){
-    fprintf(stderr, "Initial allocation for input buffer failed\n");
-    return 1;
-  }
   //pthread_t audio_thread;
   init_av_objects(total_track_number); // Initialize the objects for the package of the audio header package
 
   while (true){
-    fprintf(stderr, "Track path: ");
-    if ((fgets_unlocked(track_name, 256, stdin))==NULL){
-      fprintf(stderr, "Failed to take input\n");
-      continue;
-    }else{
-      track_name[strcspn(track_name, "\n")]='\0';
-    }
-    if (strcmp(track_name, "Q")==0 || strcmp(track_name, "q")==0){
-      fprintf(stderr, "Exiting the programme\n");
-      break;
-    }
-    play(track_name);
+    int track_number;
+    fprintf(stderr, "\nInput track number: ");
+    scanf("%d", &track_number);
+    play(track_number);
   }
 
-  free(track_name);
   free_av_objects(total_track_number); //free all the objects from the audio package 
   return 0;
 }
