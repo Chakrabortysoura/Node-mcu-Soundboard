@@ -11,14 +11,20 @@
 
 AVPacket *datapacket; // Package level datapacket to use when demuxign a particular fileformatctx.
 AVFrame *dataframe; // Package level dataframe to use when decoding from previously obtained data packets.
+AVFormatContext **trackcontext // Package level buffer to hold the context data of all the audio files. 
 
-int init_av_objects(){
+int init_av_objects(int total_track_number){
   /*
    * Initializes the objects needed for audio demuxing and playback. This function returns 0 if succesfull or 
    * exits with the proper error message. 
   */
+  if ((trackcontext=calloc(total_track_number, sizeof(AVFormatContext *)))==NULL){
+    fprintf(stderr, "Unable to allocate av context buffer for all the files\n");
+    exit(1);
+  }
   if ((dataframe=av_frame_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
+    free(trackcontext);
     exit(1);
   }
   if ((datapacket=av_packet_alloc())==NULL){
@@ -29,13 +35,16 @@ int init_av_objects(){
   return 0;
 }
 
-void free_av_objects(){
+void free_av_objects(int total_track_number){
   //Cleanup all the allocated objects before exiting the programme
   av_frame_free(&dataframe);
   av_packet_free(&datapacket);
+  for (int i=0;i<total_track_number;i++)
+    avformat_close_input(&(trackcontext+i));
+  free(trackcontext);
 }
 
-int play(char *target_track_path){
+int play(int track_number){
   /*
     * This function expeects a path to a audio track to play and all the tracks are to labelled as numbers in the 
     * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
@@ -45,23 +54,27 @@ int play(char *target_track_path){
     return -1;
   }
   
-  AVFormatContext *fileformatctx;
-  if ((fileformatctx=avformat_alloc_context())==NULL){
-    fprintf(stderr, "Unable to allocate file format ctx object. Aborting the programme.\n");
-    av_frame_free(&dataframe);
-    av_packet_free(&datapacket);
-    exit(1);
-  }
-
-  if(avformat_open_input(&fileformatctx, target_track_path, NULL, NULL)!=0){
-    fprintf(stderr, "Unable to open the requested file: %s\n", strerror(errno));
-    avformat_free_context(fileformatctx);
-    return -1;
-  }
-  if(avformat_find_stream_info(fileformatctx, NULL)<0){
-    fprintf(stderr, "Unable to obtain stream info: %s\n", strerror(errno));
-    avformat_free_context(fileformatctx);
-    return -1;
+  if (trackcontext[track_number-1]==NULL){ // if this media track is being read for the first time allocate and obtain the context for it. 
+    // This context data is stored in the trackcontext buffer. 
+    if ((trackcontext[track_number-1]=avformat_alloc_context())==NULL){
+      fprintf(stderr, "Unable to allocate file format ctx object for the file %d no track. Aborting the play function.\n", track_number);
+      return -1;
+    }
+    char target_track_path[256];
+    if (sprintf(target_track_path, "Music/%d.mp3", track_number)<0){
+      fprintf(stderr, "Error in string allocation\n");
+      return -1;
+    }
+    if(avformat_open_input(&(trackcontext[track_number]), target_track_path, NULL, NULL)!=0){
+      fprintf(stderr, "Unable to open the requested file: %s\n", strerror(errno));
+      avformat_free_context(fileformatctx);
+      return -1;
+    }
+    if(avformat_find_stream_info(trackcontext[track_number], NULL)<0){
+      fprintf(stderr, "Unable to obtain stream info: %s for the requested file\n", strerror(errno));
+      avformat_free_context(fileformatctx);
+      return -1;
+    }
   }
   fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
 
@@ -126,6 +139,5 @@ int play(char *target_track_path){
     avcodec_free_context(streamcodectx+i); //free inividual codectx from the array before cleaning the whole array
   }
   free(streamcodectx); // Free the whole buffer allocated for the all the streamcodectx objects
-  avformat_close_input(&fileformatctx);
   return 0;
 }
