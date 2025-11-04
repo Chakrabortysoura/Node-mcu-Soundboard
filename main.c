@@ -11,6 +11,11 @@
 #include "audio.h"
 
 int main(int argc, char  *argv[]){
+  int total_track_numbre=6;
+  if (arg==2){ // If the user provides a specific number of tracks that will be mapped to soundboard serial input otherwise defaults to the basic 6 inputs for nodemcu. 
+    total_track_number=atoi(argv[1]);
+  }
+  
   if (chdir("/home/souranil/")!=0){ //Always start at the users home directoryf;
     fprintf(stderr, "Error in changing the base directory: %s\n", strerror(errno));
     return 1;
@@ -24,7 +29,7 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   //pthread_t audio_thread;
-  init_av_objects(); // Initialize the objects for the package of the audio header package
+  init_av_objects(total_track_number); // Initialize the objects for the package of the audio header package
 
   while (true){
     fprintf(stderr, "Track path: ");
@@ -42,6 +47,6 @@ int main(int argc, char  *argv[]){
   }
 
   free(track_name);
-  free_av_objects(); //free all the objects from the audio package 
+  free_av_objects(total_track_number); //free all the objects from the audio package 
   return 0;
 }
