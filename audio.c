@@ -11,9 +11,6 @@
 
 AVPacket *datapacket; // Package level datapacket to use when demuxign a particular fileformatctx.
 AVFrame *dataframe; // Package level dataframe to use when decoding from previously obtained data packets.
-AVFormatContext *fileformatctx; // Package level fileformatctx. This holds the info of the file that is being currently being played.
-AVCodecContext **streamcodectx; // Package level streamcodectx object array. Allocation and deallocation of this happens inside the play function. This buffer is 
-// allocated with streamcodectx->nb_streams properties. 
 
 int init_av_objects(){
   /*
@@ -29,12 +26,6 @@ int init_av_objects(){
     av_frame_free(&dataframe);
     exit(1);
   }
-  if ((fileformatctx=avformat_alloc_context())==NULL){
-    fprintf(stderr, "Unable to allocate file format ctx object.\n");
-    av_frame_free(&dataframe);
-    av_packet_free(&datapacket);
-    exit(1);
-  }
   return 0;
 }
 
@@ -42,7 +33,6 @@ void free_av_objects(){
   //Cleanup all the allocated objects before exiting the programme
   av_frame_free(&dataframe);
   av_packet_free(&datapacket);
-  avformat_close_input(&fileformatctx);
 }
 
 int play(char *target_track_path){
@@ -50,6 +40,13 @@ int play(char *target_track_path){
     * This function expeects a path to a audio track to play and all the tracks are to labelled as numbers in the 
     * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
   */
+  AVFormatContext *fileformatctx;
+  if ((fileformatctx=avformat_alloc_context())==NULL){
+    fprintf(stderr, "Unable to allocate file format ctx object.\n");
+    av_frame_free(&dataframe);
+    av_packet_free(&datapacket);
+    exit(1);
+  }
 
   fprintf(stderr, "Track path given to the play function: %s\n", target_track_path);
   if(avformat_open_input(&fileformatctx, target_track_path, NULL, NULL)!=0){
@@ -66,7 +63,7 @@ int play(char *target_track_path){
 
   //Starting to inspect and attempt to decode each individual stream in the given file
   fprintf(stderr, "Trying to obtain stream information from the File=>\n");
-  streamcodectx=calloc(fileformatctx->nb_streams ,sizeof(AVCodecContext));
+  AVCodecContext **streamcodectx=calloc(fileformatctx->nb_streams ,sizeof(AVCodecContext *));
   if (streamcodectx==NULL){
     fprintf(stderr, "Unable to allocate streamcodectx object for the required number of streams\n");
     exit(1);
@@ -125,6 +122,6 @@ int play(char *target_track_path){
     avcodec_free_context(streamcodectx+i); //free inividual codectx from the array before cleaning the whole array
   }
   free(streamcodectx); // Free the whole buffer allocated for the all the streamcodectx objects
-
+  avformat_close_input(&fileformatctx);
   return 0;
 }
