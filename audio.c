@@ -9,9 +9,15 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
+typedef struct streamcontext{ // A struct to hold the various streamcodectx for each tracks 
+            int nb_streams;
+            AVCodecContext **streamctx;
+}StreamContext;
+
 AVPacket *datapacket; // Package level datapacket to use when demuxign a particular trackcontext[track_number-1].
 AVFrame *dataframe; // Package level dataframe to use when decoding from previously obtained data packets.
-AVFormatContext **trackcontext; // Package level buffer to hold the context data of all the audio files. 
+AVFormatContext **trackcontext; // Package level buffer to hold the context data of all the audio files.
+StreamContext *track_stream_ctx_buffer; // Package buffer for struct type streamcontext to hold all the AVCodecContext for all the track that are mapped.
 
 int check_the_format(int track_number, char *name_buffer){
   //This function tries to determine the entension of the file associated with the given track_number (eg- mp3, flac etc. Though right now only mp3 and flacs are acceptable)
@@ -26,15 +32,19 @@ int check_the_format(int track_number, char *name_buffer){
     return -1;
   }
   FILE *track=fopen(name_buffer, "r");
-  if track!=NULL
+  if (track!=NULL){
+    fprintf(stderr, "Track with mp3 extension found\n");
     return 1;
-  if (sprintf(name_buffer, "%d.mp3", track_number)<0){
+  }
+  if (sprintf(name_buffer, "%d.flac", track_number)<0){
     fprintf(stderr, "Error with sprintf while guessing the file name\n");
     return -1;
   }
   track=fopen(name_buffer, "r");
-  if track!=NULL
+  if (track!=NULL){
+    fprintf(stderr, "Track with flac extension found\n");
     return 1;
+  }
   return 0;
 }
 
@@ -55,6 +65,14 @@ int init_av_objects(int total_track_number){
   if ((datapacket=av_packet_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
     av_frame_free(&dataframe);
+    free(trackcontext);
+    exit(1);
+  }
+  if ((track_stream_ctx_buffer=calloc(total_track_number, sizeof(StreamContext)))==NULL){
+    fprintf(stderr, "Unable to allocate trackcontext buffer\n");
+    av_frame_free(&dataframe);
+    av_packet_free(&datapacket);
+    free(trackcontext);
     exit(1);
   }
   return 0;
@@ -64,9 +82,15 @@ void free_av_objects(int total_track_number){
   //Cleanup all the allocated objects before exiting the programme
   av_frame_free(&dataframe);
   av_packet_free(&datapacket);
-  for (int i=0;i<total_track_number;i++)
+  for (int i=0;i<total_track_number;i++){
     avformat_close_input(&trackcontext[i]);
+    for (int j=0;j<track_stream_ctx_buffer[i].nb_streams;j++){
+      avcodec_free_context(track_stream_ctx_buffer[i].streamctx+j);
+    }
+    free(track_stream_ctx_buffer[i].streamctx);
+  }
   free(trackcontext);
+  free(track_stream_ctx_buffer);
 }
 
 int play(int track_number){
@@ -75,7 +99,7 @@ int play(int track_number){
     * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
   */
   char target_track_path[256];
-  if (check_the_format(track_number, target_track_paht)!=1){
+  if (check_the_format(track_number, target_track_path)!=1){
     fprintf(stderr, "Aborting the play function");
     return -1;
   }

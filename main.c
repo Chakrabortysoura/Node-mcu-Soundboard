@@ -12,16 +12,14 @@
 
 int main(int argc, char  *argv[]){
   int total_track_number=6;
-  if (argc>1){ 
-    for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
-      if (strcmp(argv[i], "--total")==0){
-        if (i+1<argc){
-          total_track_number=atoi(argv[i+1]);
-          break;
-        }else{
-          fprintf(stderr, "Please provide a valid number of inputs to be mapped after the '--total' flag\n");
-          return 1;
-        }
+  for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
+    if (strcmp(argv[i], "--total")==0){
+      if (i+1<argc){
+        total_track_number=atoi(argv[i+1]);
+        break;
+      }else{
+        fprintf(stderr, "Please provide a valid number of inputs to be mapped after the '--total' flag\n");
+        return 1;
       }
     }
   }
@@ -40,6 +38,10 @@ int main(int argc, char  *argv[]){
     int track_number;
     fprintf(stderr, "\nInput track number: ");
     scanf("%d", &track_number);
+    if (track_number<0 || track_number>=total_track_number){
+      fprintf(stderr, "Closing the programme\n");
+      break;
+    }
     play(track_number);
   }
 
