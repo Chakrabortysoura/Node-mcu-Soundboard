@@ -12,8 +12,18 @@
 
 int main(int argc, char  *argv[]){
   int total_track_number=6;
-  if (argc==2){ // If the user provides a specific number of tracks that will be mapped to soundboard serial input otherwise defaults to the basic 6 inputs for nodemcu. 
-    total_track_number=atoi(argv[1]);
+  if (argc>1){ 
+    for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
+      if (strcmp(argv[i], "--total")==0){
+        if (i+1<argc){
+          total_track_number=atoi(argv[i+1]);
+          break;
+        }else{
+          fprintf(stderr, "Please provide a valid number of inputs to be mapped after the '--total' flag\n");
+          return 1;
+        }
+      }
+    }
   }
   
   if (chdir("/home/souranil/")!=0){ //Always start at the users home directoryf;
