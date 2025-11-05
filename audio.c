@@ -13,6 +13,31 @@ AVPacket *datapacket; // Package level datapacket to use when demuxign a particu
 AVFrame *dataframe; // Package level dataframe to use when decoding from previously obtained data packets.
 AVFormatContext **trackcontext; // Package level buffer to hold the context data of all the audio files. 
 
+int check_the_format(int track_number, char *name_buffer){
+  //This function tries to determine the entension of the file associated with the given track_number (eg- mp3, flac etc. Though right now only mp3 and flacs are acceptable)
+  // Returns 0 when n ocombination of th etracknumber and any file extension could be located. 
+  // -1 for any internal error usually something to do with sprintf() function. 1 when the file extension could be determined. 
+  // If the file format was determined then the name_buffer array is filled with the path. 
+  // This ensures that the file extension is not hard coded in the play function and user can easily switch to different file formats for a track if they 
+  // adhere to the correct naming conventions for the purposes of proper mapping. Though in case there exists multiple tracks with the same but different extensions
+  // the priority would be of mp3->flac (right now).
+  if (sprintf(name_buffer, "%d.mp3", track_number)<0){
+    fprintf(stderr, "Error with sprintf while guessing the file name\n");
+    return -1;
+  }
+  FILE *track=fopen(name_buffer, "r");
+  if track!=NULL
+    return 1;
+  if (sprintf(name_buffer, "%d.mp3", track_number)<0){
+    fprintf(stderr, "Error with sprintf while guessing the file name\n");
+    return -1;
+  }
+  track=fopen(name_buffer, "r");
+  if track!=NULL
+    return 1;
+  return 0;
+}
+
 int init_av_objects(int total_track_number){
   /*
    * Initializes the objects needed for audio demuxing and playback. This function returns 0 if succesfull or 
@@ -50,12 +75,13 @@ int play(int track_number){
     * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
   */
   char target_track_path[256];
-  if (sprintf(target_track_path, "Music/%d.flac", track_number)<0){
-    fprintf(stderr, "Error in string allocation\n");
+  if (check_the_format(track_number, target_track_paht)!=1){
+    fprintf(stderr, "Aborting the play function");
     return -1;
   }
+  
   if (datapacket==NULL || dataframe==NULL){
-    fprintf(stderr, "Some internal package level objects are not initialized. You may want to call init_av_objects() function.\n");
+    fprintf(stderr, "Some internal package level objects are not initialized. You may want to call init_av_objects() function before calling this play function.\n");
     return -1;
   }
   
