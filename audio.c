@@ -45,6 +45,7 @@ int check_the_format(const int track_number, char *name_buffer){
     fprintf(stderr, "Track with flac extension found\n");
     return 1;
   }
+  fprintf(stderr, "Couldn't find any file with the given name and any possible extension combination\n");
   return 0;
 }
 
@@ -93,65 +94,80 @@ void free_av_objects(const int total_track_number){
   free(track_stream_ctx_buffer);
 }
 
-int play(const int track_number){
+void * play(void *args){
   /*
     * This function expeects a path to a audio track to play and all the tracks are to labelled as numbers in the 
     * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
   */
+  PlayInput *inputs=(PlayInput *)args; 
+  fprintf(stderr, "Input track number received: %d\n", inputs->track_number);
   char target_track_path[256];
-  if (check_the_format(track_number, target_track_path)!=1){
-    fprintf(stderr, "Aborting the play function");
-    return -1;
+  if (check_the_format(inputs->track_number, target_track_path)!=1){
+    fprintf(stderr, "Aborting the play function\n");
+    inputs->result=-1;
+    return inputs;
+  }
+  if ((sprintf(target_track_path, "%d.flac", inputs->track_number))<0){
+    fprintf(stderr, "There was an error in sprintf\n");
+    inputs->result=-2;
+    return inputs;
   }
   
   if (datapacket==NULL || dataframe==NULL){
     fprintf(stderr, "Some internal package level objects are not initialized. You may want to call init_av_objects() function before calling this play function.\n");
-    return -1;
+    inputs->result=-3;
+    return inputs;
   }
   
-  if (trackcontext[track_number-1]==NULL){ // if this media track is being read for the first time allocate and obtain the context for it. 
+  if (trackcontext[inputs->track_number-1]==NULL){ // if this media track is being read for the first time allocate and obtain the context for it. 
     // This context data is stored in the trackcontext buffer. 
-    if ((trackcontext[track_number-1]=avformat_alloc_context())==NULL){
-      fprintf(stderr, "Unable to allocate file format ctx object for the file %d no track. Aborting the play function.\n", track_number);
-      return -1;
+    if ((trackcontext[inputs->track_number-1]=avformat_alloc_context())==NULL){
+      fprintf(stderr, "Unable to allocate file format ctx object for the file %d no track. Aborting the play function.\n", inputs->track_number);
+      inputs->result=-1;
+      return inputs;
     }
-    if(avformat_open_input(&(trackcontext[track_number-1]), target_track_path, NULL, NULL)!=0){
-      fprintf(stderr, "Unable to open the requested file: %s\n", strerror(errno));
-      avformat_free_context(trackcontext[track_number-1]);
-      return -1;
+    if(avformat_open_input(&(trackcontext[inputs->track_number-1]), target_track_path, NULL, NULL)!=0){
+      fprintf(stderr, "Unable to open the requested file: %s| Error: %s\n", target_track_path, strerror(errno));
+      avformat_free_context(trackcontext[inputs->track_number-1]);
+      inputs->result=-1;
+      return inputs;
     }
-    if(avformat_find_stream_info(trackcontext[track_number-1], NULL)<0){
+    if(avformat_find_stream_info(trackcontext[inputs->track_number-1], NULL)<0){
       fprintf(stderr, "Unable to obtain stream info: %s for the requested file\n", strerror(errno));
-      avformat_free_context(trackcontext[track_number-1]);
-      return -1;
+      avformat_free_context(trackcontext[inputs->track_number-1]);
+      inputs->result=-1;
+      return inputs;
     }
   }
   fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
 
-  if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
+  if (track_stream_ctx_buffer[inputs->track_number-1].streamctx==NULL){
     //Starting to inspect and attempt to decode each individual stream in the given file
-    track_stream_ctx_buffer[track_number-1].streamctx=calloc(trackcontext[track_number-1]->nb_streams ,sizeof(AVCodecContext *));
-    if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
+    track_stream_ctx_buffer[inputs->track_number-1].streamctx=calloc(trackcontext[inputs->track_number-1]->nb_streams ,sizeof(AVCodecContext *));
+    if (track_stream_ctx_buffer[inputs->track_number-1].streamctx==NULL){
       fprintf(stderr, "Unable to allocate streamcodectx object for the required number of streams\n");
-      return -1;
+      inputs->result=-1;
+      return inputs;
     }
-    for(int i=0;i<trackcontext[track_number-1]->nb_streams;i++){
-      if((track_stream_ctx_buffer[track_number-1].streamctx[i]=avcodec_alloc_context3(NULL))==NULL){ // Initialize individual each elements in the array 
+    for(int i=0;i<trackcontext[inputs->track_number-1]->nb_streams;i++){
+      if((track_stream_ctx_buffer[inputs->track_number-1].streamctx[i]=avcodec_alloc_context3(NULL))==NULL){ // Initialize individual each elements in the array 
         fprintf(stderr, "Failed to allocate for stream details.\nFile: %s Stream no: %d\n", target_track_path, i+1);
-        return -1;
+        inputs->result=-1;
+        return inputs;
       }
       // Obtain decoder and details about all streams in the file and store those context in the streamcodectx array
-      if(avcodec_open2(track_stream_ctx_buffer[track_number-1].streamctx[i], avcodec_find_decoder(trackcontext[track_number-1]->streams[i]->codecpar->codec_id), NULL)!=0){
+      if(avcodec_open2(track_stream_ctx_buffer[inputs->track_number-1].streamctx[i], avcodec_find_decoder(trackcontext[inputs->track_number-1]->streams[i]->codecpar->codec_id), NULL)!=0){
         fprintf(stderr, "Unable to get the decoder for the stream type\n");
-        return -1;
+        inputs->result=-1;
+        return inputs;
       }
       fprintf(stderr, "Stream Info\n Stream number: %d\n", i+1);
-      switch(track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->type){
-        case AVMEDIA_TYPE_AUDIO: fprintf(stderr, " Type: Audio, Codec: %s\n", track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->long_name);
+      switch(track_stream_ctx_buffer[inputs->track_number-1].streamctx[i]->codec->type){
+        case AVMEDIA_TYPE_AUDIO: fprintf(stderr, " Type: Audio, Codec: %s\n", track_stream_ctx_buffer[inputs->track_number-1].streamctx[i]->codec->long_name);
                                 break;
-        case AVMEDIA_TYPE_VIDEO: fprintf(stderr, " Type: Video, Codec: %s\n", track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->long_name);
+        case AVMEDIA_TYPE_VIDEO: fprintf(stderr, " Type: Video, Codec: %s\n", track_stream_ctx_buffer[inputs->track_number-1].streamctx[i]->codec->long_name);
                                 break;
-        case AVMEDIA_TYPE_SUBTITLE: fprintf(stderr, " Type: Subtitle, Codec: %s\n", track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->long_name);
+        case AVMEDIA_TYPE_SUBTITLE: fprintf(stderr, " Type: Subtitle, Codec: %s\n", track_stream_ctx_buffer[inputs->track_number-1].streamctx[i]->codec->long_name);
                                     break;
         default: fprintf(stderr, "Unknown codec type\n");
       }
@@ -162,11 +178,11 @@ int play(const int track_number){
   //Try to read just one packet from the file and decode that packet to a valid frame
   int demuxerr, decoderr, i=0;
   fprintf(stderr, "Starting to decode the streams=>\n");
-  while((demuxerr=av_read_frame(trackcontext[track_number-1], datapacket))==0){
+  while((demuxerr=av_read_frame(trackcontext[inputs->track_number-1], datapacket))==0){
     //Feed the decoder a packet 
-    if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){
+    if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[inputs->track_number-1].streamctx[datapacket->stream_index], datapacket))==0){
       //Retrieving decoded frames from the decoder till the decoder buff is not empty
-      while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe))==0){
+      while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[inputs->track_number-1].streamctx[datapacket->stream_index], dataframe))==0){
         i++;
         av_frame_unref(dataframe);// clean the frame after use
       }
@@ -184,7 +200,8 @@ int play(const int track_number){
     fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, demuxerr);
   }
   fprintf(stderr, "Total number of frames decoded: %d\n", i);
-  av_seek_frame(trackcontext[track_number-1], -1, 9, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
-
-  return 0;
+  av_seek_frame(trackcontext[inputs->track_number-1], -1, 9, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
+  
+  inputs->result=0;
+  return inputs;
 }
