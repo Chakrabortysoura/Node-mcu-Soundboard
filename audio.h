@@ -5,6 +5,7 @@
 
 typedef struct play_input{
 	int track_number;
+	bool is_running;
 	int result;
 }PlayInput;
 
