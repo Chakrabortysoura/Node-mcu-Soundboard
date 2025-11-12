@@ -12,7 +12,7 @@ TARGET := sound_board.out
 
 # --- Compiler and Flags ---
 CC := clang
-CFLAGS := -Wall -g2 -O0 -std=c23# -Wall enables all warnings, -g enables debugging info
+CFLAGS := -Wall -g2 -O0 -pthread -std=c23# -Wall enables all warnings, -g enables debugging info
 
 # Use pkg-config to get PipeWire's CFLAGS and LIBS
 PKG_CONFIG_PIPEWIRE_CFLAGS := $(shell pkg-config --cflags libpipewire-0.3)

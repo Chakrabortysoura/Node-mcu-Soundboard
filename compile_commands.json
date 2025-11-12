@@ -5,6 +5,7 @@
       "-Wall",
       "-g2",
       "-O0",
+      "-pthread",
       "-std=c23",
       "-I/usr/include/pipewire-0.3",
       "-I/usr/include/spa-0.2",
@@ -18,5 +19,47 @@
     "directory": "/home/souranil/Source_Code/C/Soundboard",
     "file": "/home/souranil/Source_Code/C/Soundboard/audio.c",
     "output": "/home/souranil/Source_Code/C/Soundboard/bin/audio.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-g2",
+      "-O0",
+      "-pthread",
+      "-std=c23",
+      "-I/usr/include/pipewire-0.3",
+      "-I/usr/include/spa-0.2",
+      "-D_REENTRANT",
+      "-I/usr/include/ffmpeg",
+      "-c",
+      "-o",
+      "bin/main.o",
+      "main.c"
+    ],
+    "directory": "/home/souranil/Source_Code/C/Soundboard",
+    "file": "/home/souranil/Source_Code/C/Soundboard/main.c",
+    "output": "/home/souranil/Source_Code/C/Soundboard/bin/main.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-g2",
+      "-O0",
+      "-pthread",
+      "-std=c23",
+      "-I/usr/include/pipewire-0.3",
+      "-I/usr/include/spa-0.2",
+      "-D_REENTRANT",
+      "-I/usr/include/ffmpeg",
+      "-c",
+      "-o",
+      "bin/serial_com.o",
+      "serial_com.c"
+    ],
+    "directory": "/home/souranil/Source_Code/C/Soundboard",
+    "file": "/home/souranil/Source_Code/C/Soundboard/serial_com.c",
+    "output": "/home/souranil/Source_Code/C/Soundboard/bin/serial_com.o"
   }
 ]

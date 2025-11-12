@@ -49,7 +49,7 @@ int check_the_format(const int track_number, char *name_buffer){
   return 0;
 }
 
-int init_av_objects(const int total_track_number){
+void init_av_objects(const int total_track_number){
   /*
    * Initializes the objects needed for audio demuxing and playback. This function returns 0 if succesfull or 
    * exits with the proper error message. 
@@ -76,7 +76,6 @@ int init_av_objects(const int total_track_number){
     free(trackcontext);
     exit(1);
   }
-  return 0;
 }
 
 void free_av_objects(const int total_track_number){
@@ -183,14 +182,13 @@ void * play(void *args){
   
   
   //Try to read just one packet from the file and decode that packet to a valid frame
-  int demuxerr, decoderr, i=0;
-  fprintf(stderr, "Starting to decode the streams=>\n");
+  int demuxerr, decoderr;
+  fprintf(stderr, "Starting to decode the streams\n");
   while((demuxerr=av_read_frame(trackcontext[inputs->track_number-1], datapacket))==0){
     //Feed the decoder a packet 
     if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[inputs->track_number-1].streamctx[datapacket->stream_index], datapacket))==0){
       //Retrieving decoded frames from the decoder till the decoder buff is not empty
       while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[inputs->track_number-1].streamctx[datapacket->stream_index], dataframe))==0){
-        i++;
         av_frame_unref(dataframe);// clean the frame after use
       }
     }else if(AVERROR(EINVAL)){
@@ -206,7 +204,7 @@ void * play(void *args){
   }else{
     fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, demuxerr);
   }
-  fprintf(stderr, "Total number of frames decoded: %d\n", i);
+  //fprintf(stderr, "Total number of frames decoded: %d\n", i);
   av_seek_frame(trackcontext[inputs->track_number-1], -1, 9, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
   
   inputs->result=0;

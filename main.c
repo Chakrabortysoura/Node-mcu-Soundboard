@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 #include <unistd.h>
 #include "audio.h"
 
@@ -28,21 +29,22 @@ int main(int argc, char  *argv[]){
   char buffer[800];
   fprintf(stderr, "Currect directory: %s\n", getcwd(buffer, sizeof(buffer)));
 
-  //pthread_t audio_thread;
   init_av_objects(total_track_number); // Initialize the objects for the package of the audio header package
   
-  PlayInput inputs;
+  PlayInput inputs={.track_number=-1, .result=0, .is_running=false};
+  pthread_t audio_thread;
   while (true){
-    fprintf(stderr, "\nGive Input: ");
-    scanf("%d", &inputs.track_number);
-    if (inputs.track_number<0 || inputs.track_number>=total_track_number){
-      break;
+    if (!inputs.is_running){
+      fprintf(stderr, "\nGive Input: ");
+      scanf("%d", &inputs.track_number);
+      if (inputs.track_number<0 || inputs.track_number>=total_track_number){
+        break;
+      }
+      if (pthread_create(&audio_thread, NULL, play, &inputs)!=0){
+        fprintf(stderr, "There was some error launching the audio thread\n");
+      }
     }
-    play(&inputs);
-    if (inputs.result<0)
-      break;
   }
-
   free_av_objects(total_track_number); //free all the objects from the audio package 
   fprintf(stderr, "Closing the programme\n");
   return 0;
