@@ -36,6 +36,7 @@ int main(int argc, char  *argv[]){
   while (true){
     if (!inputs.is_running){
       fprintf(stderr, "\nGive Input: ");
+      fflush(stderr);
       scanf("%d", &inputs.track_number);
       if (inputs.track_number<0 || inputs.track_number>=total_track_number){
         break;
