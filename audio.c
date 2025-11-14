@@ -205,7 +205,7 @@ void * play(void *args){
     fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, demuxerr);
   }
   //fprintf(stderr, "Total number of frames decoded: %d\n", i);
-  av_seek_frame(trackcontext[inputs->track_number-1], -1, 9, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
+  av_seek_frame(trackcontext[inputs->track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
   
   inputs->result=0;
   inputs->is_running=false;
