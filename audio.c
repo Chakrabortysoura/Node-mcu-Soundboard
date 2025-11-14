@@ -10,8 +10,8 @@
 #include <libavformat/avformat.h>
 
 typedef struct streamcontext{ // A struct to hold the various streamcodectx for each tracks 
-            int nb_streams;
-            AVCodecContext **streamctx;
+            int nb_streams; // Number of streams for i th indexed file 
+            AVCodecContext **streamctx; // array of codectx for this particular file's streams
 }StreamContext;
 
 AVPacket *datapacket; // Package level datapacket to use when demuxign a particular trackcontext[track_number-1].
