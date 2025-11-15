@@ -11,6 +11,11 @@
 #include "audio.h"
 
 int main(int argc, char  *argv[]){
+  if (chdir("/home/souranil/")!=0){ //Always start at the users home directoryf;
+    fprintf(stderr, "Error in changing the base directory: %s\n", strerror(errno));
+    return 1;
+  }
+
   int total_track_number=6;
   for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
     if (strcmp(argv[i], "--total")==0 && i+1<argc){
@@ -19,13 +24,10 @@ int main(int argc, char  *argv[]){
     if (strcmp(argv[i], "--err")==0 && i+1<argc){
       fclose(stderr);
       stderr=fopen(argv[i+1], "a");
+      fprintf(stdout, "Changed the stderr to the newfile path provided");
     }
   }
   
-  if (chdir("/home/souranil/")!=0){ //Always start at the users home directoryf;
-    fprintf(stderr, "Error in changing the base directory: %s\n", strerror(errno));
-    return 1;
-  }
   char buffer[800];
   fprintf(stderr, "Currect directory: %s\n", getcwd(buffer, sizeof(buffer)));
 
@@ -35,14 +37,15 @@ int main(int argc, char  *argv[]){
   pthread_t audio_thread;
   while (true){
     if (!inputs.is_running){
-      fprintf(stderr, "\nGive Input: ");
-      fflush(stderr);
+      fprintf(stdout, "\nGive Input: ");
+      fflush(stdout);
       scanf("%d", &inputs.track_number);
       if (inputs.track_number<0 || inputs.track_number>=total_track_number){
         break;
       }
       if (pthread_create(&audio_thread, NULL, play, &inputs)!=0){
         fprintf(stderr, "There was some error launching the audio thread\n");
+        continue;
       }
     }
   }
