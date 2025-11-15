@@ -15,7 +15,7 @@
 
 int init_serial_port(const char *serial_port_path){
   /*
-   * Function to initialize the Serial Port for communication with the ESP8266.
+   * Function to initialize the Serial Port for communication with the ESP8266 or any similar microcontroller.
    * Given the path of the serial port(eg- /dev/ttyUSB0) this function obtains the serial port file descriptor.
    * Configure the termios structure for the serial port.
    * Assigns the new control flags for the serial port and return the serial port file descriptor to the calling function for reading the data 
