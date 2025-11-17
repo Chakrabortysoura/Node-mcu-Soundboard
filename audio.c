@@ -99,26 +99,22 @@ void * play(void *args){
     * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
   */
   PlayInput *inputs=(PlayInput *)args; 
-  inputs->is_running=true;
   fprintf(stderr, "Input track number received: %d\n", inputs->track_number);
   char target_track_path[256];
   if (check_the_format(inputs->track_number, target_track_path)!=1){
     fprintf(stderr, "Aborting the play function\n");
     inputs->result=-1;
-    inputs->is_running=false;
     return inputs;
   }
   if ((sprintf(target_track_path, "%d.flac", inputs->track_number))<0){
     fprintf(stderr, "There was an error in sprintf\n");
     inputs->result=-2;
-    inputs->is_running=false;
     return inputs;
   }
   
   if (datapacket==NULL || dataframe==NULL){
     fprintf(stderr, "Some internal package level objects are not initialized. You may want to call init_av_objects() function before calling this play function.\n");
     inputs->result=-3;
-    inputs->is_running=false;
     return inputs;
   }
   
@@ -127,21 +123,18 @@ void * play(void *args){
     if ((trackcontext[inputs->track_number-1]=avformat_alloc_context())==NULL){
       fprintf(stderr, "Unable to allocate file format ctx object for the file %d no track. Aborting the play function.\n", inputs->track_number);
       inputs->result=-1;
-      inputs->is_running=false;
       return inputs;
     }
     if(avformat_open_input(&(trackcontext[inputs->track_number-1]), target_track_path, NULL, NULL)!=0){
       fprintf(stderr, "Unable to open the requested file: %s| Error: %s\n", target_track_path, strerror(errno));
       avformat_free_context(trackcontext[inputs->track_number-1]);
       inputs->result=-1;
-      inputs->is_running=false;
       return inputs;
     }
     if(avformat_find_stream_info(trackcontext[inputs->track_number-1], NULL)<0){
       fprintf(stderr, "Unable to obtain stream info: %s for the requested file\n", strerror(errno));
       avformat_free_context(trackcontext[inputs->track_number-1]);
       inputs->result=-1;
-      inputs->is_running=false;
       return inputs;
     }
   }
@@ -208,6 +201,5 @@ void * play(void *args){
   av_seek_frame(trackcontext[inputs->track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
   
   inputs->result=0;
-  inputs->is_running=false;
   return inputs;
 }
