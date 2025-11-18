@@ -36,17 +36,23 @@ int main(int argc, char  *argv[]){
   int serial_dev=init_serial_port(serial_port);
   init_av_objects(total_track_number); // Initialize the objects for the package of the audio header package
   
-  PlayInput inputs={.track_number=-1, .result=0, .is_running=false};
+  PlayInput inputs={.track_number=-1, .result=0, .is_running=false, .track_input_mutex= PTHREAD_MUTEX_INITIALIZER, .state_var_mutex=PTHREAD_MUTEX_INITIALIZER};
   pthread_t audio_thread;
   while (true){
-    if (read(serial_dev, &inputs.track_number, 1)>0){
+    pthread_mutex_lock(&inputs.state_var_mutex);
+    int read_ret=read(serial_dev, &inputs.track_number, 1);
+    pthread_mutex_unlock(&inputs.state_var_mutex);
+
+    if (read_ret>0){
       inputs.track_number-=(int) '0';
       printf("Serial input track: %d\n", inputs.track_number);
+      if (inputs.track_number>total_track_number){
+        break;
+      }
       if (pthread_create(&audio_thread, NULL, play, &inputs)!=0){
         fprintf(stderr, "Some error in spawning a new thread\n");
         continue;
       }
-      pthread_join(audio_thread, NULL);
     }
   }
   free_av_objects(total_track_number); //free all the objects from the audio package 
