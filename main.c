@@ -49,6 +49,11 @@ int main(int argc, char  *argv[]){
       if (inputs.track_number>total_track_number){
         break;
       }
+      pthread_mutex_lock(&inputs.state_var_mutex);
+      if (inputs.is_running){
+        pthread_cancel(audio_thread);
+      }
+      pthread_mutex_unlock(&inputs.state_var_mutex);
       if (pthread_create(&audio_thread, NULL, play, &inputs)!=0){
         fprintf(stderr, "Some error in spawning a new thread\n");
         continue;

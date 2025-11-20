@@ -105,11 +105,11 @@ void * play(void *args){
   int8_t track_number=inputs->track_number;
   pthread_mutex_unlock(&inputs->track_input_mutex);
   
-  fprintf(stderr, "Input track number received: %d\n", track_number);
-
   pthread_mutex_lock(&inputs->state_var_mutex);
   inputs->is_running=true;
   pthread_mutex_unlock(&inputs->state_var_mutex);
+
+  fprintf(stderr, "Input track number received: %d\n", track_number);
 
   char target_track_path[256];
   if (check_the_format(track_number, target_track_path)!=1){
@@ -138,6 +138,7 @@ void * play(void *args){
     return inputs;
   }
   
+  pthread_testcancel();  
   if (trackcontext[track_number-1]==NULL){ // if this media track is being read for the first time allocate and obtain the context for it. 
     // This context data is stored in the trackcontext buffer. 
     if ((trackcontext[track_number-1]=avformat_alloc_context())==NULL){
@@ -169,6 +170,7 @@ void * play(void *args){
   }
   fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
 
+  pthread_testcancel();  
   if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
     //Starting to inspect and attempt to decode each individual stream in the given file
     track_stream_ctx_buffer[track_number-1].streamctx=calloc(trackcontext[track_number-1]->nb_streams ,sizeof(AVCodecContext *));
@@ -211,15 +213,17 @@ void * play(void *args){
     }  
   }
   
-  
+  pthread_testcancel();  
   //Try to read just one packet from the file and decode that packet to a valid frame
   int demuxerr, decoderr;
   fprintf(stderr, "Starting to decode the streams\n");
   while((demuxerr=av_read_frame(trackcontext[track_number-1], datapacket))==0){
     //Feed the decoder a packet 
+    pthread_testcancel();  
     if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){
       //Retrieving decoded frames from the decoder till the decoder buff is not empty
       while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe))==0){
+        pthread_testcancel();  
         av_frame_unref(dataframe);// clean the frame after use
       }
     }else if(AVERROR(EINVAL)){
