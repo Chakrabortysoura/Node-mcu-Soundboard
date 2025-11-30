@@ -138,37 +138,97 @@ int get_avcodec_decoder(const int track_number){
 }
 
 int check_sample_rate(const int track_number){
+  /*
+   * Reads the audio file uptil we get a datapacket from the audio file that belongs to one of the audio streams and then 
+   * returns the sample rate of the audio stream. 
+   * Returns -1 for any error or audio sample rate(greater than 0).
+   */
   int err;
   if (&track_stream_ctx_buffer[track_number-1]==NULL){// If this particular track(given with the track_number) is yet to be read once 
     err=read_audio_file_header(track_number);
     if (err!=0){ // Failed to read the header from the audio file. Error val from the read_audio_file_header is returned
-      return err;
+      return -1;
     }
   }
   if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
-    int ret=get_avcodec_decoder(track_number);
-    if (ret!=0){// Failed to get all the decoder for all the stream in the audio file
-      return ret;
+    err=get_avcodec_decoder(track_number);
+    if (err!=0){// Failed to get all the decoder for all the stream in the audio file
+      return -1;
     }
   }
-  if (av_read_frame(trackcontext_buffer[track_number-1], datapacket)!=0){// Failed to read a AVPacket from the audio header
-    fprintf(stderr, "Error while trying to read a frame from the audio file\n");
-    return -1;
+  int audio_sample_rate=-1;
+  while (true){
+    err=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
+    if (err!=0){
+      fprintf(stderr, "Error: Unable to read frame from track no:%d\n", track_number);
+      break;
+    }
+    if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
+      // Calculate the sample rate when we get the first frame from the stream containing the audio data 
+      err=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket);
+      if (err!=0){
+        fprintf(stderr, "Error: Unable to feed packet to the decoder. Track no:%d\n", track_number);
+        break;
+      }
+      err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe);
+      if (err!=0){
+        fprintf(stderr, "Error: Unable to decode packet to frame. Track no:%d\n", track_number);
+        break;
+      }
+      audio_sample_rate=dataframe->sample_rate;
+    }
   }
-  err=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket);
-  if (err!=0){
-    fprintf(stderr, "Error while feeding the decoder for this audiopacket\n");
-    return -1;
-  }
-  err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe);
-  if (err!=0){
-    fprintf(stderr, "Error while feeding the decoder for this audiopacket\n");
-    return -1;
-  }
-  return dataframe->sample_rate;
+  av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
+  av_packet_unref(datapacket);  
+  av_frame_unref(dataframe);
+  
+  return audio_sample_rate;
 }
 
 int check_number_of_channels(const int track_number){
+  /*
+   * This function returns the number of channels after reading a frame from the file 
+   */
+  int err;
+  if (&track_stream_ctx_buffer[track_number-1]==NULL){// If this particular track(given with the track_number) is yet to be read once 
+    err=read_audio_file_header(track_number);
+    if (err!=0){ // Failed to read the header from the audio file. Error val from the read_audio_file_header is returned
+      return -1;
+    }
+  }
+  if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
+    err=get_avcodec_decoder(track_number);
+    if (err!=0){// Failed to get all the decoder for all the stream in the audio file
+      return -1;
+    }
+  }
+  int channels_number=-1;
+  while (true){
+    err=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
+    if (err!=0){
+      fprintf(stderr, "Error: Unable to read frame from track no:%d\n", track_number);
+      break;
+    }
+    if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
+      // Calculate the sample rate when we get the first frame from the stream containing the audio data 
+      err=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket);
+      if (err!=0){
+        fprintf(stderr, "Error: Unable to feed packet to the decoder. Track no:%d\n", track_number);
+        break;
+      }
+      err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe);
+      if (err!=0){
+        fprintf(stderr, "Error: Unable to decode packet to frame. Track no:%d\n", track_number);
+        break;
+      }
+      channels_number=dataframe->ch_layout.nb_channels;
+    }
+  }
+  av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
+  av_packet_unref(datapacket);  
+  av_frame_unref(dataframe);
+  
+  return channels_number;
 }
 
 void * play(void *args){
