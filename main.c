@@ -10,6 +10,8 @@
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
 
+#include "audio.h"
+
 typedef struct data{
   struct pw_main_loop *loop;
   struct pw_core *core;
@@ -22,7 +24,7 @@ int main(int argc, char  *argv[]){
     return 1;
   }
 
-  int8_t track_number;
+  int8_t track_number=6;
   char *serial_port;
   for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
     if (strcmp(argv[i], "--err")==0 && i+1<argc){
@@ -65,7 +67,18 @@ int main(int argc, char  *argv[]){
     //fprintf(stderr, "Stream creation failed\n");
     //return 1;
   //}
-  
+  if (init_av_objects(track_number)!=0){
+    fprintf(stderr, "Closing the programme\n");
+    return -1;
+  }
+  printf("Give the track number: ");
+  scanf("%d", &track_number);
+  int audio_sample_rate=check_sample_rate(track_number);
+  if (audio_sample_rate>0){
+    printf("Sample rate fo the file: %d\n", audio_sample_rate);
+  }
+
+  free_av_objects(track_number);
   fprintf(stderr, "Closing the programme\n");
   return 0;
 }

@@ -24,7 +24,7 @@ typedef struct play_input{
 
 void *play(void *args);
 
-void init_av_objects(const int total_track_number);
+int init_av_objects(const int total_track_number);
 
 void free_av_objects(const int total_track_number);
 

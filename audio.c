@@ -51,33 +51,34 @@ int check_the_format(const int track_number, char *name_buffer){
   return 1;
 }
 
-void init_av_objects(const int total_track_number){
+int init_av_objects(const int total_track_number){
   /*
    * Initializes the objects needed for audio demuxing and playback. This function returns 0 if succesfull or 
    * exits with the proper error message. 
   */
   if ((trackcontext_buffer=calloc(total_track_number, sizeof(AVFormatContext *)))==NULL){
     fprintf(stderr, "Unable to allocate av context buffer for all the files\n");
-    exit(1);
+    return -1;
   }
   if ((dataframe=av_frame_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
     free(trackcontext_buffer);
-    exit(1);
+    return -1;
   }
   if ((datapacket=av_packet_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
     av_frame_free(&dataframe);
     free(trackcontext_buffer);
-    exit(1);
+    return -1;
   }
   if ((track_stream_ctx_buffer=calloc(total_track_number, sizeof(StreamContext)))==NULL){
     fprintf(stderr, "Unable to allocate trackcontext buffer\n");
     av_frame_free(&dataframe);
     av_packet_free(&datapacket);
     free(trackcontext_buffer);
-    exit(1);
+    return -1;
   }
+  return 0;
 }
 
 void free_av_objects(const int total_track_number){
@@ -150,12 +151,14 @@ int check_sample_rate(const int track_number){
       return -1;
     }
   }
+  fprintf(stderr, "Audio file header read successfully\n");
   if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
     err=get_avcodec_decoder(track_number);
     if (err!=0){// Failed to get all the decoder for all the stream in the audio file
       return -1;
     }
   }
+  fprintf(stderr, "Got the decoders for all the streams for the audio file\n");
   int audio_sample_rate=-1;
   while (true){
     err=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
