@@ -26,7 +26,7 @@ void *play(void *args);
 
 int init_av_objects(const int total_track_number);
 
-void free_av_objects(const int total_track_number);
+void deinit_av_objects(const int total_track_number);
 
 int check_sample_rate(const int track_number);
 

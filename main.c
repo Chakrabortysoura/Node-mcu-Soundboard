@@ -24,7 +24,7 @@ int main(int argc, char  *argv[]){
     return 1;
   }
 
-  int8_t track_number=6;
+  int8_t total_track_number=6;
   char *serial_port;
   for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
     if (strcmp(argv[i], "--err")==0 && i+1<argc){
@@ -33,7 +33,7 @@ int main(int argc, char  *argv[]){
     }else if (strcmp(argv[i], "--serial")==0 && i+1<argc){
      serial_port=argv[i+1]; 
     }else if (strcmp(argv[i], "--track")==0 && i+1<argc){
-      track_number=atoi(argv[i+1]);
+      total_track_number=atoi(argv[i+1]);
     }
   }
   
@@ -67,18 +67,18 @@ int main(int argc, char  *argv[]){
     //fprintf(stderr, "Stream creation failed\n");
     //return 1;
   //}
-  if (init_av_objects(track_number)!=0){
+  if (init_av_objects(total_track_number)!=0){
     fprintf(stderr, "Closing the programme\n");
     return -1;
   }
   printf("Give the track number: ");
+  int track_number;
   scanf("%d", &track_number);
   int audio_sample_rate=check_sample_rate(track_number);
   if (audio_sample_rate>0){
-    printf("Sample rate fo the file: %d\n", audio_sample_rate);
+    printf("Sample rate of the file: %d\n", audio_sample_rate);
   }
-
-  free_av_objects(track_number);
+  deinit_av_objects(total_track_number);
   fprintf(stderr, "Closing the programme\n");
   return 0;
 }
