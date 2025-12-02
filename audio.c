@@ -169,7 +169,7 @@ int check_number_of_channels(const int track_number){
    * This function returns the number of channels after reading a frame from the file 
    */
   int err;
-  if (&track_stream_ctx_buffer[track_number-1]==NULL){// If this particular track(given with the track_number) is yet to be read once 
+  if (&trackcontext_buffer[track_number-1]==NULL){// If this particular track(given with the track_number) is yet to be read once 
     err=read_audio_file_header(track_number);
     if (err!=0){ // Failed to read the header from the audio file. Error val from the read_audio_file_header is returned
       return -1;
@@ -201,6 +201,7 @@ int check_number_of_channels(const int track_number){
         break;
       }
       channels_number=dataframe->ch_layout.nb_channels;
+      break;
     }
   }
   av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
