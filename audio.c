@@ -101,7 +101,10 @@ int get_avcodec_decoder(const int track_number){
    */
   int nb=trackcontext_buffer[track_number-1]->nb_streams; // number of streams in the file
   track_stream_ctx_buffer[track_number-1].nb_streams=nb;
-  track_stream_ctx_buffer[track_number-1].streamctx=calloc(nb, sizeof(AVCodecContext*));
+  if ((track_stream_ctx_buffer[track_number-1].streamctx=calloc(nb, sizeof(AVCodecContext*)))==NULL){
+    fprintf(stderr, "Error allocating AVCodecContext buffer array for the file: %d\n", track_number);
+    return -1;
+  }
   for(int i=0;i<nb;i++){
     if ((track_stream_ctx_buffer[track_number-1].streamctx[i]=avcodec_alloc_context3(NULL))==NULL){
       fprintf(stderr, "Internal error allocating AVCodecContext object for the %d stream for audio file: %d", i, track_number);
@@ -239,78 +242,26 @@ void * play(void *args){
   }
   
   pthread_testcancel();  
-  if (trackcontext_buffer[track_number-1]==NULL){ // if this media track is being read for the first time allocate and obtain the context for it. 
-    // This context data is stored in the trackcontext buffer. 
-    if ((trackcontext_buffer[track_number-1]=avformat_alloc_context())==NULL){
-      fprintf(stderr, "Unable to allocate file format ctx object for the file %d no track. Aborting the play function.\n", track_number);
-      inputs->result=-1;
-      pthread_mutex_lock(&inputs->state_var_mutex);
-      inputs->is_running=false;
-      pthread_mutex_unlock(&inputs->state_var_mutex);
-      return inputs;
-    }
-    if(avformat_open_input(&(trackcontext_buffer[track_number-1]), target_track_path, NULL, NULL)!=0){
-      fprintf(stderr, "Unable to open the requested file: %s| Error: %s\n", target_track_path, strerror(errno));
-      avformat_free_context(trackcontext_buffer[track_number-1]);
-      inputs->result=-1;
-      pthread_mutex_lock(&inputs->state_var_mutex);
-      inputs->is_running=false;
-      pthread_mutex_unlock(&inputs->state_var_mutex);
-      return inputs;
-    }
-    if(avformat_find_stream_info(trackcontext_buffer[track_number-1], NULL)<0){
-      fprintf(stderr, "Unable to obtain stream info: %s for the requested file\n", strerror(errno));
-      avformat_free_context(trackcontext_buffer[track_number-1]);
-      inputs->result=-1;
-      pthread_mutex_lock(&inputs->state_var_mutex);
-      inputs->is_running=false;
-      pthread_mutex_unlock(&inputs->state_var_mutex);
-      return inputs;
+  if (trackcontext_buffer[track_number-1]==NULL){ 
+    if (read_audio_header(track_number)!=0){
+       inputs->result=-1;
+       pthread_mutex_lock(&inputs->state_var_mutex);
+       inputs->is_running=false;
+       pthread_mutex_unlock(&inputs->state_var_mutex);
+       return inputs;
     }
   }
   fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
 
   pthread_testcancel();  
   if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
-    //Starting to inspect and attempt to decode each individual stream in the given file
-    track_stream_ctx_buffer[track_number-1].streamctx=calloc(trackcontext_buffer[track_number-1]->nb_streams ,sizeof(AVCodecContext *));
-    if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
-      fprintf(stderr, "Unable to allocate streamcodectx object for the required number of streams\n");
-      inputs->result=-1;
-      pthread_mutex_lock(&inputs->state_var_mutex);
-      inputs->is_running=false;
-      pthread_mutex_unlock(&inputs->state_var_mutex);
-      return inputs;
-    }
-    for(int i=0;i<trackcontext_buffer[track_number-1]->nb_streams;i++){
-      if((track_stream_ctx_buffer[track_number-1].streamctx[i]=avcodec_alloc_context3(NULL))==NULL){ // Initialize individual each elements in the array 
-        fprintf(stderr, "Failed to allocate for stream details.\nFile: %s Stream no: %d\n", target_track_path, i+1);
-        inputs->result=-1;
-        pthread_mutex_lock(&inputs->state_var_mutex);
-        inputs->is_running=false;
-        pthread_mutex_unlock(&inputs->state_var_mutex);
-        return inputs;
-      }
-      // Obtain decoder and details about all streams in the file and store those context in the streamcodectx array
-      if(avcodec_open2(track_stream_ctx_buffer[track_number-1].streamctx[i], avcodec_find_decoder(trackcontext_buffer[track_number-1]->streams[i]->codecpar->codec_id), NULL)!=0){
-        fprintf(stderr, "Unable to get the decoder for the stream type\n");
-        inputs->result=-1;
-        pthread_mutex_lock(&inputs->state_var_mutex);
-        inputs->is_running=false;
-        pthread_mutex_unlock(&inputs->state_var_mutex);
-        return inputs;
-      }
-      fprintf(stderr, "Stream Info\n Stream number: %d\n", i+1);
-      switch(track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->type){
-        case AVMEDIA_TYPE_AUDIO: fprintf(stderr, " Type: Audio, Codec: %s\n", track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->long_name);
-                                break;
-        case AVMEDIA_TYPE_VIDEO: fprintf(stderr, " Type: Video, Codec: %s\n", track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->long_name);
-                                break;
-        case AVMEDIA_TYPE_SUBTITLE: fprintf(stderr, " Type: Subtitle, Codec: %s\n", track_stream_ctx_buffer[track_number-1].streamctx[i]->codec->long_name);
-                                    break;
-        default: fprintf(stderr, "Unknown codec type\n");
-      }
-    }  
+     if (get_avcodec_decoder(track_number)!=0){
+       inputs->result=-1;
+       pthread_mutex_lock(&inputs->state_var_mutex);
+       inputs->is_running=false;
+       pthread_mutex_unlock(&inputs->state_var_mutex);
+       return inputs;
+     }
   }
   
   pthread_testcancel();  
