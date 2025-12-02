@@ -74,9 +74,9 @@ int main(int argc, char  *argv[]){
   printf("Give the track number: ");
   int track_number;
   scanf("%d", &track_number);
-  int audio_sample_rate=check_sample_rate(track_number);
-  if (audio_sample_rate>0){
-    printf("Sample rate of the file: %d\n", audio_sample_rate);
+  int totalnchannel=check_number_of_channels(track_number);
+  if (totalnchannel!=-1){
+    fprintf(stderr, "Total number of channels in the audio file :%d\n", totalnchannel);
   }
   deinit_av_objects(total_track_number);
   fprintf(stderr, "Closing the programme\n");
