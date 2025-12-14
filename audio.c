@@ -9,6 +9,8 @@
 #include <pthread.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswresample/swresample.h>
+#include <libavutil/opt.h>
 
 typedef struct streamcontext{ // A struct to hold the various streamcodectx for each tracks 
             int nb_streams; // Number of streams for i th indexed file 
@@ -16,36 +18,81 @@ typedef struct streamcontext{ // A struct to hold the various streamcodectx for 
 }StreamContext;
 
 AVPacket *datapacket; // Package level datapacket to use when demuxign a particular trackcontext_buffer[track_number-1].
-AVFrame *dataframe; // Package level dataframe to use when decoding from previously obtained data packets.
+AVFrame *dataframein, *dataframeout; // Package level dataframe to use when decoding from previously obtained data packets.
 AVFormatContext **trackcontext_buffer; // Package level buffer to hold the context data of all the audio files.
 StreamContext *track_stream_ctx_buffer; // Package buffer for struct type streamcontext to hold all the AVCodecContext for all the track that are mapped.
+SwrContext *resampler; // Context containing all the necessary AVOptions for resampling og audio frame data to our desired standard
 
+int init_resampler(){
+  /*
+   * This function initialized the SwrContext object with the properties of the target output 
+   * format(channellayout, sampling rate etc.).
+   */
+  if ((resampler=swr_alloc())==NULL){
+    fprintf(stderr, "Failed to allocate the SwrContext object for the resampler\n");
+    return -1;
+  }
+  if ((av_opt_set_chlayout(resampler, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0))!=0){
+    fprintf(stderr, "Error configuring ouput channel layout for the resampler\n");
+    return -1;
+  }
+  if ((av_opt_set_int(resampler, "out_sample_rate", 44100, 0))!=0){
+    fprintf(stderr, "Error configuring ouput sampling rate for the resampler\n");
+    return -1;
+  }
+  if ((av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLTP, 0))!=0){
+    fprintf(stderr, "Error configuring ouput format for the resampler\n");
+    return -1;
+  }
+  return 0;
+}
 
 int init_av_objects(const int total_track_number){
   /*
-   * Initializes the objects needed for audio demuxing and playback. This function returns 0 if succesfull or 
+   * Initializes the objects needed for audio demuxing and playback. This function returns 0 if successfull or 
    * exits with the proper error message. 
   */
   if ((trackcontext_buffer=calloc(total_track_number, sizeof(AVFormatContext *)))==NULL){
     fprintf(stderr, "Unable to allocate av context buffer for all the files\n");
     return -1;
   }
-  if ((dataframe=av_frame_alloc())==NULL){
+  if ((dataframein=av_frame_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
     free(trackcontext_buffer);
     return -1;
   }
-  if ((datapacket=av_packet_alloc())==NULL){
+  if ((dataframeout=av_frame_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av frame\n");
-    av_frame_free(&dataframe);
+    av_frame_free(&dataframein);
+    free(trackcontext_buffer);
+    return -1;
+  }else{
+    dataframeout->ch_layout.nb_channels=2;
+    dataframeout->sample_rate=44100;
+    dataframeout->format=AV_SAMPLE_FMT_FLT;
+  }
+  if ((datapacket=av_packet_alloc())==NULL){
+    fprintf(stderr, "Unable to allocate av packet\n");
+    av_frame_free(&dataframein);
+    av_frame_free(&dataframeout);
+    free(trackcontext_buffer);
+    return -1;
+  }
+  if ((init_resampler())!=0){
+    fprintf(stderr, "Failed to initialized the ffmpeg resampler object\n");
+    av_frame_free(&dataframein);
+    av_frame_free(&dataframeout);
+    av_packet_free(&datapacket);
     free(trackcontext_buffer);
     return -1;
   }
   if ((track_stream_ctx_buffer=calloc(total_track_number, sizeof(StreamContext)))==NULL){
     fprintf(stderr, "Unable to allocate trackcontext buffer\n");
-    av_frame_free(&dataframe);
+    av_frame_free(&dataframein);
+    av_frame_free(&dataframeout);
     av_packet_free(&datapacket);
     free(trackcontext_buffer);
+    swr_free(&resampler);
     return -1;
   }
   return 0;
@@ -53,7 +100,8 @@ int init_av_objects(const int total_track_number){
 
 void deinit_av_objects(const int total_track_number){
   //Cleanup all the allocated objects before exiting the programme
-  av_frame_free(&dataframe);
+  av_frame_free(&dataframein);
+  av_frame_free(&dataframeout);
   av_packet_free(&datapacket);
   for (int i=0;i<total_track_number;i++){
     avformat_close_input(&trackcontext_buffer[i]);
@@ -90,6 +138,7 @@ int read_audio_file_header(const int track_number){
     fprintf(stderr, "Error inspecting stream information for the audio trcak: %s\n", target_track_path);
     return -1;
   }
+  av_dump_format(trackcontext_buffer[track_number-1], -1, NULL, 0);
   return 0;
 }
 
@@ -116,6 +165,45 @@ int get_avcodec_decoder(const int track_number){
     }
   }
   return 0;
+}
+
+int configure_resampler(const int track_number){
+  /*
+   * This function configures the SwrContext object with the properties of the input audio file.
+   * The target format remains the same regardless for compatibility with pipewire pw_buffer configurations 
+   * at the time of initialization. This function assumes that AVFormatContext for the target input audio file is opened properly
+   * and the decoders for the streams of the audio file is allocated properly.
+   */ 
+  int err=0;
+  while (true){
+    err=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
+    if (err!=0){
+      fprintf(stderr, "Error: Unable to read frame from track no:%d\n", track_number);
+      break;
+    }
+    if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
+      // Calculate the sample rate when we get the first frame from the stream containing the audio data 
+      err=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket);
+      if (err!=0){
+        fprintf(stderr, "Error: Unable to feed packet to the decoder. Track no:%d\n", track_number);
+        break;
+      }
+      err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein);
+      if (err!=0){
+        fprintf(stderr, "Error: Unable to decode packet to frame. Track no:%d\n", track_number);
+        break;
+      }
+      break;
+    }
+    av_packet_unref(datapacket);
+  }
+  if (err!=0 && (swr_config_frame(resampler, dataframeout, dataframein))!=0){
+    fprintf(stderr, "Failed to configure resampler for conversion from the source audio file to the target type\n");
+  }
+  av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD);
+  av_packet_unref(datapacket);  
+  av_frame_unref(dataframein);
+  return err;
 }
 
 int check_sample_rate(const int track_number){
@@ -151,18 +239,19 @@ int check_sample_rate(const int track_number){
         fprintf(stderr, "Error: Unable to feed packet to the decoder. Track no:%d\n", track_number);
         break;
       }
-      err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe);
+      err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein);
       if (err!=0){
         fprintf(stderr, "Error: Unable to decode packet to frame. Track no:%d\n", track_number);
         break;
       }
-      audio_sample_rate=dataframe->sample_rate;
+      audio_sample_rate=dataframein->sample_rate;
       break;
     }
+    av_packet_unref(datapacket);
   }
   av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
   av_packet_unref(datapacket);  
-  av_frame_unref(dataframe);
+  av_frame_unref(dataframein);
   
   return audio_sample_rate;
 }
@@ -198,18 +287,18 @@ int check_number_of_channels(const int track_number){
         fprintf(stderr, "Error: Unable to feed packet to the decoder. Track no:%d\n", track_number);
         break;
       }
-      err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe);
+      err=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein);
       if (err!=0){
         fprintf(stderr, "Error: Unable to decode packet to frame. Track no:%d\n", track_number);
         break;
       }
-      channels_number=dataframe->ch_layout.nb_channels;
+      channels_number=dataframein->ch_layout.nb_channels;
       break;
     }
   }
   av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
   av_packet_unref(datapacket);  
-  av_frame_unref(dataframe);
+  av_frame_unref(dataframein);
   
   return channels_number;
 }
@@ -273,9 +362,9 @@ void * play(void *args){
     pthread_testcancel();  
     if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){
       //Retrieving decoded frames from the decoder till the decoder buff is not empty
-      while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframe))==0){
+      while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein))==0){
         pthread_testcancel();  
-        av_frame_unref(dataframe);// clean the frame after use
+        av_frame_unref(dataframein);// clean the frame after use
       }
     }else if(AVERROR(EINVAL)){
       fprintf(stderr, "Codec not opened.\n");
