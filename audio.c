@@ -22,9 +22,8 @@ AVFrame *dataframein, *dataframeout; // Package level dataframe to use when deco
 AVFormatContext **trackcontext_buffer; // Package level buffer to hold the context data of all the audio files.
 StreamContext *track_stream_ctx_buffer; // Package buffer for struct type streamcontext to hold all the AVCodecContext for all the track that are mapped.
 SwrContext *resampler; // Context containing all the necessary AVOptions for resampling og audio frame data to our desired standard
-bool is_sampler_configured;
 
-int init_resampler(){
+int init_resampler_out_params(){
   /*
    * This function initialized the SwrContext object with the properties of the target output 
    * format(channellayout, sampling rate etc.).
@@ -87,7 +86,7 @@ int init_av_objects(const int total_track_number){
     free(trackcontext_buffer);
     return -1;
   }else{
-    is_sampler_configured=false;
+    init_resampler_out_params();
   }
   if ((track_stream_ctx_buffer=calloc(total_track_number, sizeof(StreamContext)))==NULL){
     fprintf(stderr, "Unable to allocate trackcontext buffer\n");
@@ -358,7 +357,7 @@ void * play(void *args){
   }
   //fprintf(stderr, "Total number of frames decoded: %d\n", i);
   av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
-  
+  swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
   inputs->result=0;
   pthread_mutex_lock(&inputs->state_var_mutex);
   inputs->is_running=false;
