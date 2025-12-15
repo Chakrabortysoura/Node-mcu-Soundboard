@@ -23,30 +23,6 @@ AVFormatContext **trackcontext_buffer; // Package level buffer to hold the conte
 StreamContext *track_stream_ctx_buffer; // Package buffer for struct type streamcontext to hold all the AVCodecContext for all the track that are mapped.
 SwrContext *resampler; // Context containing all the necessary AVOptions for resampling og audio frame data to our desired standard
 
-int init_resampler_out_params(){
-  /*
-   * This function initialized the SwrContext object with the properties of the target output 
-   * format(channellayout, sampling rate etc.).
-   */
-  if ((resampler=swr_alloc())==NULL){
-    fprintf(stderr, "Failed to allocate the SwrContext object for the resampler\n");
-    return -1;
-  }
-  if ((av_opt_set_chlayout(resampler, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0))!=0){
-    fprintf(stderr, "Error configuring ouput channel layout for the resampler\n");
-    return -1;
-  }
-  if ((av_opt_set_int(resampler, "out_sample_rate", 44100, 0))!=0){
-    fprintf(stderr, "Error configuring ouput sampling rate for the resampler\n");
-    return -1;
-  }
-  if ((av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLTP, 0))!=0){
-    fprintf(stderr, "Error configuring ouput format for the resampler\n");
-    return -1;
-  }
-  return 0;
-}
-
 int init_av_objects(const int total_track_number){
   /*
    * Initializes the objects needed for audio demuxing and playback. This function returns 0 if successfull or 
@@ -85,8 +61,6 @@ int init_av_objects(const int total_track_number){
     av_packet_free(&datapacket);
     free(trackcontext_buffer);
     return -1;
-  }else{
-    init_resampler_out_params();
   }
   if ((track_stream_ctx_buffer=calloc(total_track_number, sizeof(StreamContext)))==NULL){
     fprintf(stderr, "Unable to allocate trackcontext buffer\n");
@@ -173,9 +147,8 @@ int get_avcodec_decoder(const int track_number){
 int configure_resampler(const int track_number){
   /*
    * This function configures the SwrContext object with the properties of the input audio file.
-   * The target format remains the same regardless for compatibility with pipewire pw_buffer configurations 
-   * at the time of initialization. This function assumes that AVFormatContext for the target input audio file is opened properly
-   * and the decoders for the streams of the audio file is allocated properly.
+   * The target format remains the same regardless to maintains compatibility with pipewire pw_buffer configurations 
+   * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin..
    */ 
   if (swr_config_frame(resampler, dataframeout, dataframein)!=0){
     fprintf(stderr, "Error in configuring resampler for the source and target audio data. Track number: %d\n", track_number);
@@ -337,6 +310,10 @@ void * play(void *args){
   fprintf(stderr, "Starting to decode the streams\n");
   while((demuxerr=av_read_frame(trackcontext_buffer[track_number-1], datapacket))==0){
     pthread_testcancel();  
+    if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
+        if (swr_is_intialized(resampler)==0 && configure_resampler()!=0){
+            fprintf(stderr, "Could configure the resampler exiting the programme.\n");
+        }
     if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){ // Feed the decoder a AVPacket 
       while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein))==0){ //Retrieving decoded frames from the decoder till the decoder buff is not empty
         pthread_testcancel();  
@@ -346,7 +323,7 @@ void * play(void *args){
       fprintf(stderr, "Codec not opened.\n");
     }else{
       fprintf(stderr, "Unknown error sending packets to the decoder.\n");
-    }
+    }}
     av_packet_unref(datapacket);// clean the packet after use
   }
 
