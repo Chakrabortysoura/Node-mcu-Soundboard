@@ -126,7 +126,7 @@ int main(int argc, char  *argv[]){
                     PW_STREAM_FLAG_RT_PROCESS,
                     &param, 1);
   
-  pw_main_loop_run(data.loop);
+  //pw_main_loop_run(data.loop);
 
   fprintf(stderr, "Closing the programme\n");
   return 0;

@@ -261,11 +261,11 @@ void * play(void *args){
   */
   PlayInput *inputs=(PlayInput *)args; 
   
-  pthread_mutex_lock(&inputs->track_input_mutex);
+  pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
   pthread_mutex_unlock(&inputs->track_input_mutex);
   
-  pthread_mutex_lock(&inputs->state_var_mutex);
+  pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running by the shared variable
   inputs->is_running=true;
   pthread_mutex_unlock(&inputs->state_var_mutex);
 
@@ -273,7 +273,7 @@ void * play(void *args){
 
   char target_track_path[10];
   if (sprintf(&target_track_path[0], "%d.flac", track_number)<=0){
-    fprintf(stderr, "Aborting the play function\n");
+    fprintf(stderr, "Aborting the play function. Internal error with the sprintf() function\n");
     inputs->result=-1;
     pthread_mutex_lock(&inputs->state_var_mutex);
     inputs->is_running=false;
@@ -284,11 +284,12 @@ void * play(void *args){
   pthread_testcancel();  
   if (trackcontext_buffer[track_number-1]==NULL){ 
     if (read_audio_file_header(track_number)!=0){
-       inputs->result=-1;
-       pthread_mutex_lock(&inputs->state_var_mutex);
-       inputs->is_running=false;
-       pthread_mutex_unlock(&inputs->state_var_mutex);
-       return inputs;
+      fprintf(stderr, "Aborting the play function. Error in reading audio file header data\n");
+      inputs->result=-1;
+      pthread_mutex_lock(&inputs->state_var_mutex);
+      inputs->is_running=false;
+      pthread_mutex_unlock(&inputs->state_var_mutex);
+      return inputs;
     }
   }
   fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
@@ -296,34 +297,36 @@ void * play(void *args){
   pthread_testcancel();  
   if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
      if (get_avcodec_decoder(track_number)!=0){
-       inputs->result=-1;
-       pthread_mutex_lock(&inputs->state_var_mutex);
-       inputs->is_running=false;
-       pthread_mutex_unlock(&inputs->state_var_mutex);
-       return inputs;
+      fprintf(stderr, "Aborting the play function. Error in getting the decoders for the audio file streams.\n");
+      inputs->result=-1;
+      pthread_mutex_lock(&inputs->state_var_mutex);
+      inputs->is_running=false;
+      pthread_mutex_unlock(&inputs->state_var_mutex);
+      return inputs;
      }
   }
   
-  pthread_testcancel();  
-  //Try to read just one packet from the file and decode that packet to a valid frame
+  pthread_testcancel();  // Another exit point from this function
+
   int demuxerr, decoderr;
   fprintf(stderr, "Starting to decode the streams\n");
   while((demuxerr=av_read_frame(trackcontext_buffer[track_number-1], datapacket))==0){
     pthread_testcancel();  
     if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
-        if (swr_is_intialized(resampler)==0 && configure_resampler()!=0){
-            fprintf(stderr, "Could configure the resampler exiting the programme.\n");
-        }
-    if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){ // Feed the decoder a AVPacket 
-      while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein))==0){ //Retrieving decoded frames from the decoder till the decoder buff is not empty
-        pthread_testcancel();  
-        av_frame_unref(dataframein); // Clean the frame after use
+      if (swr_is_initialized(resampler)==0 && configure_resampler(track_number)!=0){
+        fprintf(stderr, "Could configure the resampler exiting the programme.\n");
       }
-    }else if(AVERROR(EINVAL)){
-      fprintf(stderr, "Codec not opened.\n");
-    }else{
-      fprintf(stderr, "Unknown error sending packets to the decoder.\n");
-    }}
+      if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){ // Feed the decoder a AVPacket 
+        while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein))==0){ //Retrieving decoded frames from the decoder till the decoder buffer is not empty
+          pthread_testcancel();  
+          av_frame_unref(dataframein); // Clean the frame after use
+        }
+      }else if(AVERROR(EINVAL)){
+        fprintf(stderr, "Codec not opened.\n");
+      }else{
+        fprintf(stderr, "Unknown error sending packets to the decoder.\n");
+      }
+    }
     av_packet_unref(datapacket);// clean the packet after use
   }
 
