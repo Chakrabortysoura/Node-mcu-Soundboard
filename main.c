@@ -17,7 +17,8 @@
 static int8_t total_track_number;
 
 void termination_handler(int sign){
-  deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
+  fprintf(stderr, "Terminating signal handler invoked\n");
+  //deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
 }
 
 typedef struct data{

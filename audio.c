@@ -42,8 +42,9 @@ int init_av_objects(const int total_track_number){
     av_frame_free(&dataframein);
     free(trackcontext_buffer);
     return -1;
-  }else{
-    dataframeout->ch_layout.nb_channels=2;
+  }else{ 
+    // Configure the output dataframe struct
+    av_channel_layout_default(&(dataframein->ch_layout), 2);
     dataframeout->sample_rate=44100;
     dataframeout->format=AV_SAMPLE_FMT_FLT;
   }
@@ -335,7 +336,7 @@ void * play(void *args){
   }else{
     fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, demuxerr);
   }
-  //fprintf(stderr, "Total number of frames decoded: %d\n", i);
+
   av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
   swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
   inputs->result=0;
