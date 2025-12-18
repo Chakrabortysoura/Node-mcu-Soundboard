@@ -59,7 +59,7 @@ int main(int argc, char  *argv[]){
         fprintf(stderr, "Please provide the address to the serial port.\n");
         return 1;
       }
-    }else if (strcmp(argv[i], "--track")==0 && i+1<argc){
+    }else if (strcmp(argv[i], "--track")==0){
       if (i+1<argc){
         total_track_number=atoi(argv[i+1]);
       }else{
