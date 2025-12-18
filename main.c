@@ -7,10 +7,18 @@
 #include <errno.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <signal.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
 
 #include "audio.h"
+
+
+static int8_t total_track_number;
+
+void termination_handler(int sign){
+  deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
+}
 
 typedef struct data{
   struct pw_main_loop *loop;
@@ -29,12 +37,16 @@ const struct pw_stream_events stream_events={
 };
 
 int main(int argc, char  *argv[]){
+  signal(SIGINT, termination_handler); // Registering some basic signal handlers for the programme. 
+  signal(SIGTERM, termination_handler);
+  signal(SIGKILL, termination_handler);
+  
   if (chdir("/home/souranil/Music")!=0){ //Always start at the users home directoryf;
     fprintf(stderr, "Error in changing the base directory: %s\n", strerror(errno));
     return 1;
   }
 
-  int8_t total_track_number=6;
+  total_track_number=6;
   char *serial_port;
   for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
     if (strcmp(argv[i], "--err")==0 && i+1<argc){
