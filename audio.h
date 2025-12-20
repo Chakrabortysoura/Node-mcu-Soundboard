@@ -22,7 +22,6 @@ typedef struct play_input{
 	bool is_running;
 }PlayInput;
 
-int configure_resampler(const int track_number);
 
 void *play(void *args);
 
@@ -30,8 +29,5 @@ int init_av_objects(const int total_track_number);
 
 void deinit_av_objects(const int total_track_number);
 
-int check_sample_rate(const int track_number);
-
-int check_number_of_channels(const int track_number);
 
 #endif

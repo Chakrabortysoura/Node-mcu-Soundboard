@@ -4,6 +4,7 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include <errno.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -93,19 +94,15 @@ int main(int argc, char  *argv[]){
     return 1;
   }
 
-  int track_number;
+  PlayInput audio_play_input;
   printf("track number:");
-  scanf("%d", &track_number);
-  while (track_number>=total_track_number){
+  scanf("%" SCNd8, &audio_play_input.track_number);
+  while (audio_play_input.track_number>=total_track_number){
     printf("Target track_number should be within the total_track_number: %d\n", total_track_number);
     printf("track number:");
-    scanf("%d", &track_number);
+    scanf("%c", &audio_play_input.track_number);
   }
-  char audio_sample_rate[20];
-  if (sprintf(&audio_sample_rate[0], "%d", check_sample_rate(track_number))<0){
-    fprintf(stderr, "Sprintf error when converting sample rate to a str\n");
-    return 1;
-  }
+  play(&audio_play_input);
 
   data.stream=pw_stream_new(
     data.core, "soundboard audio stream", 
@@ -114,7 +111,7 @@ int main(int argc, char  *argv[]){
       PW_KEY_MEDIA_CATEGORY, "Playback",
       PW_KEY_MEDIA_ROLE, "Music",
       PW_KEY_NODE_NAME, "Audio source"
-      PW_KEY_NODE_RATE, audio_sample_rate,
+      PW_KEY_NODE_RATE, 44100,
       NULL)
   );
   if (data.stream==NULL){
@@ -127,8 +124,8 @@ int main(int argc, char  *argv[]){
   const struct spa_pod *param=spa_format_audio_raw_build(&b, SPA_PARAM_EnumFormat,
                                       &SPA_AUDIO_INFO_RAW_INIT(
                                         .format=SPA_AUDIO_FORMAT_F32,
-                                        .channels=check_number_of_channels(track_number),
-                                        .rate=check_sample_rate(track_number))
+                                        .channels=2,
+                                        .rate=44100)
                                       );
   
   pw_stream_connect(data.stream, 
@@ -139,7 +136,6 @@ int main(int argc, char  *argv[]){
                     PW_STREAM_FLAG_RT_PROCESS,
                     &param, 1);
   
-  //pw_main_loop_run(data.loop);
 
   fprintf(stderr, "Closing the programme\n");
   return 0;

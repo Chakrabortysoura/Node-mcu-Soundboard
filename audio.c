@@ -212,41 +212,53 @@ void * play(void *args){
   
   pthread_testcancel();  // Another exit point from this function
 
-  int demuxerr, decoderr;
+  int err_ret=0;
   fprintf(stderr, "Starting to decode the streams\n");
-  while((demuxerr=av_read_frame(trackcontext_buffer[track_number-1], datapacket))==0){
+  while(true){
+    err_ret=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
+    if (err_ret==AVERROR_EOF){ // Handle the last demuxing error that happened at the time of while loop end
+      fprintf(stderr, "End of File reached: %s. Completed decoding of the whole File.\n", target_track_path);
+      goto closing;
+    }else if (err_ret!=0){
+      fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, err_ret);
+      goto closing;
+    }
     pthread_testcancel();  
+    
     if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
-      if (swr_is_initialized(resampler)==0 && configure_resampler(track_number)!=0){
-        fprintf(stderr, "Could configure the resampler exiting the programme.\n");
+      if (swr_is_initialized(resampler)==0 && configure_resampler(track_number)!=0){ // reconfigure the swr resampler for the current input audio file params
+        fprintf(stderr, "Could not configure the resampler exiting play function.\n");
+        av_packet_unref(datapacket);
+        goto closing;
       }
-      // Feed the decoder a AVPacket 
-      if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){ 
-        //Retrieving decoded frames from the decoder untill the decoder buffer is empty
-        while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein))==0){ 
-          pthread_testcancel();  
-          av_frame_unref(dataframein); // Clean the frame after use
+      err_ret=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket); 
+      if (err_ret==AVERROR(EINVAL) || err_ret!=0){
+        fprintf(stderr, "Error occured while trying to feed the decoder datapackets\n");
+        av_packet_unref(datapacket);// clean the packet after use
+        goto closing;
+      }
+      while(true){
+        err_ret=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein);
+        if (err_ret==AVERROR(EAGAIN) || err_ret==AVERROR_EOF){
+          break;
+        }else if (err_ret!=0){ // EINVAL cannot happen but still excluded just for debugging purposes.
+          fprintf(stderr, "Error while receiving frames from the decoder. Error :%d\n", err_ret);
+          avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
+          av_packet_unref(datapacket);// clean the packet after use
+          goto closing;
         }
-      }else if(AVERROR(EINVAL)){
-        fprintf(stderr, "Codec not opened.\n");
-      }else{
-        fprintf(stderr, "Unknown error sending packets to the decoder.\n");
       }
     }
     av_packet_unref(datapacket);// clean the packet after use
   }
 
-  if (demuxerr==AVERROR_EOF){
-    fprintf(stderr, "End of File reached: %s\n", target_track_path);
-  }else{
-    fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, demuxerr);
-  }
-
-  av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
-  swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
-  inputs->result=0;
-  pthread_mutex_lock(&inputs->state_var_mutex);
-  inputs->is_running=false;
-  pthread_mutex_unlock(&inputs->state_var_mutex);
-  return inputs;
+  closing:
+    av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
+    swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
+    inputs->result=err_ret;
+    pthread_mutex_lock(&inputs->state_var_mutex);
+    inputs->is_running=false;
+    pthread_mutex_unlock(&inputs->state_var_mutex);
+    return inputs;
+  
 }
