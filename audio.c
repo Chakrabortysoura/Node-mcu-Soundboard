@@ -220,8 +220,10 @@ void * play(void *args){
       if (swr_is_initialized(resampler)==0 && configure_resampler(track_number)!=0){
         fprintf(stderr, "Could configure the resampler exiting the programme.\n");
       }
-      if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){ // Feed the decoder a AVPacket 
-        while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein))==0){ //Retrieving decoded frames from the decoder till the decoder buffer is not empty
+      // Feed the decoder a AVPacket 
+      if((decoderr=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket))==0){ 
+        //Retrieving decoded frames from the decoder untill the decoder buffer is empty
+        while((decoderr=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein))==0){ 
           pthread_testcancel();  
           av_frame_unref(dataframein); // Clean the frame after use
         }
