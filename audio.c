@@ -42,11 +42,6 @@ int init_av_objects(const int total_track_number){
     av_frame_free(&dataframein);
     free(trackcontext_buffer);
     return -1;
-  }else{ 
-    // Configure the output dataframe struct
-    av_channel_layout_default(&(dataframein->ch_layout), 2);
-    dataframeout->sample_rate=44100;
-    dataframeout->format=AV_SAMPLE_FMT_FLT;
   }
   if ((datapacket=av_packet_alloc())==NULL){
     fprintf(stderr, "Unable to allocate av packet\n");
@@ -151,8 +146,15 @@ int configure_resampler(const int track_number){
    * The target format remains the same regardless to maintains compatibility with pipewire pw_buffer configurations 
    * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin..
    */ 
+  av_channel_layout_default(&dataframeout->ch_layout, 2);
+  dataframeout->sample_rate=44100;
+  dataframeout->format=AV_SAMPLE_FMT_FLT;
   if (swr_config_frame(resampler, dataframeout, dataframein)!=0){
-    fprintf(stderr, "Error in configuring resampler for the source and target audio data. Track number: %d\n", track_number);
+    fprintf(stderr, "Error in configuring resampler for the source and target audio data.Track number: %d\n", track_number);
+    return -1;
+  }
+  if (swr_init(resampler)!=0){
+    fprintf(stderr, "Error when initializing the resampler. Track number: %d\n", track_number);
     return -1;
   }
   return 0;
@@ -226,11 +228,6 @@ void * play(void *args){
     pthread_testcancel();  
     
     if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
-      if (swr_is_initialized(resampler)==0 && configure_resampler(track_number)!=0){ // reconfigure the swr resampler for the current input audio file params
-        fprintf(stderr, "Could not configure the resampler exiting play function.\n");
-        av_packet_unref(datapacket);
-        goto closing;
-      }
       err_ret=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket); 
       if (err_ret==AVERROR(EINVAL) || err_ret!=0){
         fprintf(stderr, "Error occured while trying to feed the decoder datapackets\n");
@@ -238,7 +235,7 @@ void * play(void *args){
         goto closing;
       }
       while(true){
-        err_ret=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein);
+        err_ret=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein); //Retrieve a frame from the decoder that was feeded previously. This continues until there is an error in the avcodec_receive frame return method
         if (err_ret==AVERROR(EAGAIN) || err_ret==AVERROR_EOF){
           break;
         }else if (err_ret!=0){ // EINVAL cannot happen but still excluded just for debugging purposes.
@@ -247,11 +244,33 @@ void * play(void *args){
           av_packet_unref(datapacket);// clean the packet after use
           goto closing;
         }
+
+        /*
+        * If the swrcontext resampler is non intialized at the start of decoding an audio frame configure it and initialize the resampler.
+        * This reconfiguration is done with the configure_resampler() helper function. 
+        */
+        if (configure_resampler(track_number)!=0){ 
+          fprintf(stderr, "Could not configure the resampler exiting play function.\n");
+          av_packet_unref(datapacket);
+          goto closing;
+        }
+
+        err_ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
+        if (err_ret!=0){
+          fprintf(stderr, "Error while converting frames using resampler. Error: %d\n", err_ret); //Error while configuring resampler so aborting the process entirely
+          avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
+          av_packet_unref(datapacket);
+          av_frame_unref(dataframein);
+          av_frame_unref(dataframeout);
+          goto closing;
+        }
+        av_frame_unref(dataframein);
+        av_frame_unref(dataframeout);
       }
     }
     av_packet_unref(datapacket);// clean the packet after use
   }
-
+  
   closing:
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
