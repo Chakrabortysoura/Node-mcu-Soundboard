@@ -146,10 +146,13 @@ int configure_resampler(const int track_number){
    * The target format remains the same regardless to maintains compatibility with pipewire pw_buffer configurations 
    * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin..
    */ 
-  av_channel_layout_default(&dataframeout->ch_layout, 2);
-  dataframeout->sample_rate=44100;
-  dataframeout->format=AV_SAMPLE_FMT_FLT;
-  if (swr_config_frame(resampler, dataframeout, dataframein)!=0){
+  av_opt_set_chlayout(swr, "in_chlayout", &(AVChannelLayout)datapacketin->ch_layout, 0);
+  av_opt_set_chlayout(swr, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0);
+  av_opt_set_int(swr, "in_sample_rate", datapacketint->sample_rate, 0);
+  av_opt_set_int(swr, "out_sample_rate", 44100, 0);
+  av_opt_set_sample_fmt(swr, "in_sample_fmt", datapacketin->format, 0);
+  av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_S16, 0);                        
+  if (err!=0){
     fprintf(stderr, "Error in configuring resampler for the source and target audio data.Track number: %d\n", track_number);
     return -1;
   }
