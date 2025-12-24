@@ -146,15 +146,16 @@ int configure_resampler(const int track_number){
    * The target format remains the same regardless to maintains compatibility with pipewire pw_buffer configurations 
    * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin..
    */ 
-  av_opt_set_chlayout(swr, "in_chlayout", &(AVChannelLayout)datapacketin->ch_layout, 0);
-  av_opt_set_chlayout(swr, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0);
-  av_opt_set_int(swr, "in_sample_rate", datapacketint->sample_rate, 0);
-  av_opt_set_int(swr, "out_sample_rate", 44100, 0);
-  av_opt_set_sample_fmt(swr, "in_sample_fmt", datapacketin->format, 0);
-  av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_S16, 0);                        
+  int err=0;
+  fprintf(stderr, "Resampler cofiguration helper function was called\n");
+  err|=av_opt_set_chlayout(resampler, "in_chlayout", &dataframein->ch_layout, 0);
+  err|=av_opt_set_chlayout(resampler, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0);
+  err|=av_opt_set_int(resampler, "in_sample_rate", dataframein->sample_rate, 0);
+  err|=av_opt_set_int(resampler, "out_sample_rate", 44100, 0);
+  err|=av_opt_set_sample_fmt(resampler, "in_sample_fmt", dataframein->format, 0);
+  err|=av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
   if (err!=0){
-    fprintf(stderr, "Error in configuring resampler for the source and target audio data.Track number: %d\n", track_number);
-    return -1;
+    fprintf(stderr, "Failed to configure the resampler parameters\n");
   }
   if (swr_init(resampler)!=0){
     fprintf(stderr, "Error when initializing the resampler. Track number: %d\n", track_number);
@@ -252,7 +253,7 @@ void * play(void *args){
         * If the swrcontext resampler is non intialized at the start of decoding an audio frame configure it and initialize the resampler.
         * This reconfiguration is done with the configure_resampler() helper function. 
         */
-        if (configure_resampler(track_number)!=0){ 
+        if (!swr_is_initialized(resampler) && configure_resampler(track_number)!=0){ 
           fprintf(stderr, "Could not configure the resampler exiting play function.\n");
           av_packet_unref(datapacket);
           goto closing;
