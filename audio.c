@@ -144,19 +144,23 @@ int configure_resampler(const int track_number){
   /*
    * This function configures the SwrContext object with the properties of the input audio file.
    * The target format remains the same regardless to maintains compatibility with pipewire pw_buffer configurations 
-   * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin..
+   * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin.
    */ 
+  //AVCodecContext *decoder_props=track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]; // Get the decoded that is being used right now to get the properties for the input dataframe
+  
+  // Initialize the ouput dataframe with the pre defined output frame parameters
+  dataframeout->sample_rate=44100;
+  dataframeout->format=AV_SAMPLE_FMT_FLT;
+  av_channel_layout_default(&dataframeout->ch_layout, 2);
+
   int err=0;
   fprintf(stderr, "Resampler cofiguration helper function was called\n");
-  err|=av_opt_set_chlayout(resampler, "in_chlayout", &dataframein->ch_layout, 0);
-  err|=av_opt_set_chlayout(resampler, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0);
-  err|=av_opt_set_int(resampler, "in_sample_rate", dataframein->sample_rate, 0);
-  err|=av_opt_set_int(resampler, "out_sample_rate", 44100, 0);
-  err|=av_opt_set_sample_fmt(resampler, "in_sample_fmt", dataframein->format, 0);
-  err|=av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
+  err=swr_config_frame(resampler, dataframeout, dataframein);
   if (err!=0){
     fprintf(stderr, "Failed to configure the resampler parameters\n");
+    return -1;
   }
+  //Initialize the resampler for use in play function
   if (swr_init(resampler)!=0){
     fprintf(stderr, "Error when initializing the resampler. Track number: %d\n", track_number);
     return -1;
@@ -253,7 +257,7 @@ void * play(void *args){
         * If the swrcontext resampler is non intialized at the start of decoding an audio frame configure it and initialize the resampler.
         * This reconfiguration is done with the configure_resampler() helper function. 
         */
-        if (!swr_is_initialized(resampler) && configure_resampler(track_number)!=0){ 
+        if (!swr_is_initialized(resampler) && configure_resampler(track_number)!=0){
           fprintf(stderr, "Could not configure the resampler exiting play function.\n");
           av_packet_unref(datapacket);
           goto closing;
@@ -262,6 +266,11 @@ void * play(void *args){
         err_ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
         if (err_ret!=0){
           fprintf(stderr, "Error while converting frames using resampler. Error: %d\n", err_ret); //Error while configuring resampler so aborting the process entirely
+          if (err_ret==AVERROR_INPUT_CHANGED){
+            fprintf(stderr, "Error with the input config\n");
+          }else if (err_ret==AVERROR_OUTPUT_CHANGED){
+            fprintf(stderr, "Error with the output config\n");
+          }
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
           av_packet_unref(datapacket);
           av_frame_unref(dataframein);
