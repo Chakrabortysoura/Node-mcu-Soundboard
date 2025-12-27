@@ -146,16 +146,14 @@ int configure_resampler(const int track_number){
    * The target format remains the same regardless to maintains compatibility with pipewire pw_buffer configurations 
    * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin.
    */ 
-  //AVCodecContext *decoder_props=track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]; // Get the decoded that is being used right now to get the properties for the input dataframe
   
-  // Initialize the ouput dataframe with the pre defined output frame parameters
-  dataframeout->sample_rate=44100;
-  dataframeout->format=AV_SAMPLE_FMT_FLT;
-  av_channel_layout_default(&dataframeout->ch_layout, 2);
-
   int err=0;
-  fprintf(stderr, "Resampler cofiguration helper function was called\n");
-  err=swr_config_frame(resampler, dataframeout, dataframein);
+  err|=av_opt_set_int(resampler, "in_sample_rate", dataframein->sample_rate, 0);
+  err|=av_opt_set_int(resampler, "out_sample_rate", 44100, 0);
+  err|=av_opt_set_chlayout(resampler, "in_chlayout", &dataframein->ch_layout,0);
+  err|=av_opt_set_chlayout(resampler, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0);
+  err|=av_opt_set_sample_fmt(resampler, "in_sample_fmt", dataframein->format, 0);
+  err|=av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
   if (err!=0){
     fprintf(stderr, "Failed to configure the resampler parameters\n");
     return -1;
@@ -263,13 +261,19 @@ void * play(void *args){
           goto closing;
         }
 
+        //Configure the output frame metedata properly
+        dataframeout->sample_rate=44100;
+        dataframeout->format=AV_SAMPLE_FMT_FLT;
+        dataframeout->ch_layout=(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO; 
+
         err_ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
         if (err_ret!=0){
-          fprintf(stderr, "Error while converting frames using resampler. Error: %d\n", err_ret); //Error while configuring resampler so aborting the process entirely
           if (err_ret==AVERROR_INPUT_CHANGED){
             fprintf(stderr, "Error with the input config\n");
           }else if (err_ret==AVERROR_OUTPUT_CHANGED){
             fprintf(stderr, "Error with the output config\n");
+          }else{
+            fprintf(stderr, "Error while converting frames using resampler. Error: %d\n", err_ret); //Error while configuring resampler so aborting the process entirely
           }
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
           av_packet_unref(datapacket);
@@ -277,8 +281,8 @@ void * play(void *args){
           av_frame_unref(dataframeout);
           goto closing;
         }
-        av_frame_unref(dataframein);
         av_frame_unref(dataframeout);
+        av_frame_unref(dataframein);
       }
     }
     av_packet_unref(datapacket);// clean the packet after use
