@@ -226,7 +226,7 @@ void * play(void *args){
     err_ret=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
     if (err_ret==AVERROR_EOF){ // Handle the last demuxing error that happened at the time of while loop end
       fprintf(stderr, "End of File reached: %s. Completed decoding of the whole File.\n", target_track_path);
-      goto closing;
+      break;
     }else if (err_ret!=0){
       fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, err_ret);
       goto closing;
@@ -287,7 +287,7 @@ void * play(void *args){
     }
     av_packet_unref(datapacket);// clean the packet after use
   }
-  
+   
   closing:
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 

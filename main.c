@@ -16,10 +16,13 @@
 
 
 static int8_t total_track_number;
+static struct pw_main_loop *main_loop;
 
 void termination_handler(int sign){
-  fprintf(stderr, "Terminating signal handler invoked\n");
+  fprintf(stderr, "\nTerminating signal handler invoked\n");
+  //pw_main_loop_quit(main_loop); 
   //deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
+  exit(0);
 }
 
 typedef struct data{
@@ -29,9 +32,7 @@ typedef struct data{
 }PW_Data;
 
 void on_process(void *userdata){
-  for (int i=0;i<1000;i++){
-    printf("Node processing\n");
-  }
+  printf("On processing function is called for this node\n");
 }
 const struct pw_stream_events stream_events={
     PW_VERSION_STREAM_EVENTS,
@@ -42,6 +43,7 @@ int main(int argc, char  *argv[]){
   signal(SIGINT, termination_handler); // Registering some basic signal handlers for the programme. 
   signal(SIGTERM, termination_handler);
   signal(SIGKILL, termination_handler);
+  signal(SIGSTOP, termination_handler);
   
   if (chdir("/home/souranil/Music")!=0){ //Always start at the users home directoryf;
     fprintf(stderr, "Error in changing the base directory: %s\n", strerror(errno));
@@ -70,25 +72,6 @@ int main(int argc, char  *argv[]){
       }
     }
   }
-  pw_init(NULL, NULL);
-
-  PW_Data data={0,};
-
-  if ((data.loop=pw_main_loop_new(NULL))==NULL){
-    fprintf(stderr, "Failed to acquire a pw main loop\n");
-    return 1;
-  }
-
-  struct pw_context *context=pw_context_new(pw_main_loop_get_loop(data.loop),NULL, 0);
-  if (context==NULL){
-    fprintf(stderr, "Unable to acquire a pw context\n");
-    return 1;
-  }
-  if ((data.core=pw_context_connect(context, NULL, 0))==NULL){
-    fprintf(stderr, "Unable to connet to pw core deamon\n");
-    return 1;
-  }
-  
   if (init_av_objects(total_track_number)<0){
     fprintf(stderr, "Error in initalizing all the internal audio buffers\n");
     return 1;
@@ -104,6 +87,26 @@ int main(int argc, char  *argv[]){
   }
   play(&audio_play_input);
 
+  pw_init(NULL, NULL);
+
+  PW_Data data={0,};
+
+  if ((main_loop=pw_main_loop_new(NULL))==NULL){
+    fprintf(stderr, "Failed to acquire a pw main loop\n");
+    return 1;
+  }
+  data.loop=main_loop;
+
+  struct pw_context *context=pw_context_new(pw_main_loop_get_loop(data.loop),NULL, 0);
+  if (context==NULL){
+    fprintf(stderr, "Unable to acquire a pw context\n");
+    return 1;
+  }
+  if ((data.core=pw_context_connect(context, NULL, 0))==NULL){
+    fprintf(stderr, "Unable to connet to pw core deamon\n");
+    return 1;
+  }
+
   data.stream=pw_stream_new(
     data.core, "soundboard audio stream", 
     pw_properties_new(
@@ -118,7 +121,9 @@ int main(int argc, char  *argv[]){
     fprintf(stderr, "Unable to create a new pw_stream\n");
     return 1;
   }
-
+  struct spa_hook event_listener;
+  pw_stream_add_listener(data.stream, &event_listener, &stream_events, &data);
+  
   uint8_t buffer[10024];
   struct spa_pod_builder b=SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
   const struct spa_pod *param=spa_format_audio_raw_build(&b, SPA_PARAM_EnumFormat,
@@ -136,7 +141,8 @@ int main(int argc, char  *argv[]){
                     PW_STREAM_FLAG_RT_PROCESS,
                     &param, 1);
   
-
+  pw_main_loop_run(data.loop);
+  
   fprintf(stderr, "Closing the programme\n");
   return 0;
 }
