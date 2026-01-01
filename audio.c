@@ -23,7 +23,7 @@ AVFormatContext **trackcontext_buffer; // Package level buffer to hold the conte
 StreamContext *track_stream_ctx_buffer; // Package buffer for struct type streamcontext to hold all the AVCodecContext for all the track that are mapped.
 SwrContext *resampler; // Context containing all the necessary AVOptions for resampling og audio frame data to our desired standard
 
-int init_av_objects(const int total_track_number){
+int8_t init_av_objects(const int total_track_number){
   /*
    * Initializes the objects needed for audio demuxing and playback. This function returns 0 if successfull or 
    * exits with the proper error message. 
@@ -297,4 +297,17 @@ void * play(void *args){
     pthread_mutex_unlock(&inputs->state_var_mutex);
     return inputs;
   
+}
+
+void * produce_data_for_pipe(void *args){
+  PlayInput *input=(PlayInput *) args;
+  fprintf(stderr, "Producer called.\n");
+  for (int i=1;i<200;i++){
+    while (write(input->pipe_write_head, &i,sizeof(int))==0){
+      fprintf(stderr, "Pipe filled with data waiting for the data to be read by the consumer\n");
+    }
+    fprintf(stderr, "Data sent to the consumer: %d\n", i);
+  }
+  close(input->pipe_write_head);
+  return args;
 }

@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
@@ -17,6 +18,7 @@
 
 static int8_t total_track_number;
 static struct pw_main_loop *main_loop;
+static int pipeline[2];
 
 void termination_handler(int sign){
   fprintf(stderr, "\nTerminating signal handler invoked\n");
@@ -29,6 +31,7 @@ typedef struct data{
   struct pw_main_loop *loop;
   struct pw_core *core;
   struct pw_stream *stream;
+  int pipe_read_head;
 }PW_Data;
 
 void on_process(void *userdata){
@@ -77,26 +80,39 @@ int main(int argc, char  *argv[]){
     return 1;
   }
 
-  PlayInput audio_play_input;
-  printf("track number:");
-  scanf("%" SCNd8, &audio_play_input.track_number);
-  while (audio_play_input.track_number>=total_track_number){
-    printf("Target track_number should be within the total_track_number: %d\n", total_track_number);
-    printf("track number:");
-    scanf("%c", &audio_play_input.track_number);
+  if (pipe2(pipeline, O_NONBLOCK)!=0){ // Initiate the pipe file descriptor
+    fprintf(stderr, "Error while creating pipe for sending the pipewire server data");
   }
-  play(&audio_play_input);
 
+  PlayInput audio_play_input={.pipe_write_head=pipeline[1],};
+  //printf("track number:");
+  //scanf("%" SCNd8, &audio_play_input.track_number);
+  //while (audio_play_input.track_number>=total_track_number){
+    //printf("Target track_number should be within the total_track_number: %d\n", total_track_number);
+    //printf("track number:");
+    //scanf("%c", &audio_play_input.track_number);
+  //}
+  //play(&audio_play_input);
+  pthread_t t1;
+  if (pthread_create(&t1, NULL, produce_data_for_pipe, &audio_play_input)!=0){
+    fprintf(stderr, "Error spawing a new thread\n");
+    return 1;
+  }
+  int buff; 
+  while(read(pipeline[0], &buff, sizeof(int))!=0){
+    fprintf(stderr, "Data received from the pipe(producer): %d\n", buff);
+  }
+  close(pipeline[0]);
   pw_init(NULL, NULL);
 
   PW_Data data={0,};
-
+  
   if ((main_loop=pw_main_loop_new(NULL))==NULL){
     fprintf(stderr, "Failed to acquire a pw main loop\n");
     return 1;
   }
   data.loop=main_loop;
-
+  data.pipe_read_head=pipeline[0];
   struct pw_context *context=pw_context_new(pw_main_loop_get_loop(data.loop),NULL, 0);
   if (context==NULL){
     fprintf(stderr, "Unable to acquire a pw context\n");
@@ -141,7 +157,7 @@ int main(int argc, char  *argv[]){
                     PW_STREAM_FLAG_RT_PROCESS,
                     &param, 1);
   
-  pw_main_loop_run(data.loop);
+  //pw_main_loop_run(data.loop);
   
   fprintf(stderr, "Closing the programme\n");
   return 0;
