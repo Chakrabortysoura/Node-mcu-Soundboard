@@ -1,11 +1,11 @@
 # --- makefile for PipeWire Project ---
 
 # Source files
-SRCS := $(wildcard *.c)
+SRCS := $(wildcard src/*.c)
 # You can add more source files like: SRCS := main.c utils.c audio_processing.c
 
 # Object files (compiled .o files from source files)
-OBJS := $(patsubst %.c,bin/%.o,$(SRCS))
+OBJS := $(patsubst src/%.c, bin/%.o,$(SRCS))
 
 # Executable name
 TARGET := sound_board.out
@@ -38,7 +38,7 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o bin/$(TARGET) $(ALL_LIBS)
 
-bin/%.o: %.c
+bin/%.o: src/%.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 clean:

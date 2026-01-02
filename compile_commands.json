@@ -13,10 +13,70 @@
       "-c",
       "-o",
       "bin/audio.o",
-      "audio.c"
+      "src/audio.c"
     ],
     "directory": "/home/souranil/Source_Code/C/Soundboard",
-    "file": "/home/souranil/Source_Code/C/Soundboard/audio.c",
+    "file": "/home/souranil/Source_Code/C/Soundboard/src/audio.c",
     "output": "/home/souranil/Source_Code/C/Soundboard/bin/audio.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-g2",
+      "-O0",
+      "-pthread",
+      "-std=c23",
+      "-I/usr/include/pipewire-0.3",
+      "-I/usr/include/spa-0.2",
+      "-D_REENTRANT",
+      "-c",
+      "-o",
+      "bin/config_reader.o",
+      "src/config_reader.c"
+    ],
+    "directory": "/home/souranil/Source_Code/C/Soundboard",
+    "file": "/home/souranil/Source_Code/C/Soundboard/src/config_reader.c",
+    "output": "/home/souranil/Source_Code/C/Soundboard/bin/config_reader.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-g2",
+      "-O0",
+      "-pthread",
+      "-std=c23",
+      "-I/usr/include/pipewire-0.3",
+      "-I/usr/include/spa-0.2",
+      "-D_REENTRANT",
+      "-c",
+      "-o",
+      "bin/main.o",
+      "src/main.c"
+    ],
+    "directory": "/home/souranil/Source_Code/C/Soundboard",
+    "file": "/home/souranil/Source_Code/C/Soundboard/src/main.c",
+    "output": "/home/souranil/Source_Code/C/Soundboard/bin/main.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-g2",
+      "-O0",
+      "-pthread",
+      "-std=c23",
+      "-I/usr/include/pipewire-0.3",
+      "-I/usr/include/spa-0.2",
+      "-D_REENTRANT",
+      "-c",
+      "-o",
+      "bin/serial_com.o",
+      "src/serial_com.c"
+    ],
+    "directory": "/home/souranil/Source_Code/C/Soundboard",
+    "file": "/home/souranil/Source_Code/C/Soundboard/src/serial_com.c",
+    "output": "/home/souranil/Source_Code/C/Soundboard/bin/serial_com.o"
   }
 ]
