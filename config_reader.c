@@ -1,6 +1,10 @@
 //
 // created by souranil on 2/1/2026.
 //
+#include <stdint.h>
+#include <string.h>
+#include "config_reader.h"
+
 int64_t index(const char *str, const char search_term){
     /*This function searches for a particular search_term char in the given string
     * returns -1 on failure to find the search_term or index of the char in the string.
