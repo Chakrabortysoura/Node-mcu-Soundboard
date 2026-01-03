@@ -3,6 +3,7 @@
 //
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include <errno.h>
@@ -10,37 +11,21 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <pipewire/pipewire.h>
-#include <spa/param/audio/format-utils.h>
 
 #include "audio.h"
-
+#include "pw_config.h"
 
 static int8_t total_track_number;
-static struct pw_main_loop *main_loop;
 static int pipeline[2];
 
 void termination_handler(int sign){
   fprintf(stderr, "\nTerminating signal handler invoked\n");
   //pw_main_loop_quit(main_loop); 
   //deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
+  fprintf(stderr, "Closing the programme\n");
   exit(0);
 }
 
-typedef struct data{
-  struct pw_main_loop *loop;
-  struct pw_core *core;
-  struct pw_stream *stream;
-  int pipe_read_head;
-}PW_Data;
-
-void on_process(void *userdata){
-  printf("On processing function is called for this node\n");
-}
-const struct pw_stream_events stream_events={
-    PW_VERSION_STREAM_EVENTS,
-    .process=on_process,
-};
 
 int main(int argc, char  *argv[]){
   signal(SIGINT, termination_handler); // Registering some basic signal handlers for the programme. 
@@ -82,9 +67,10 @@ int main(int argc, char  *argv[]){
 
   if (pipe2(pipeline, O_NONBLOCK)!=0){ // Initiate the pipe file descriptor
     fprintf(stderr, "Error while creating pipe for sending the pipewire server data");
+    return 1;
   }
-
-  PlayInput audio_play_input={.pipe_write_head=pipeline[1],};
+  
+  PlayInput audio_play_input={.pipe_write_head=pipeline[1],.track_number=1};
   //printf("track number:");
   //scanf("%" SCNd8, &audio_play_input.track_number);
   //while (audio_play_input.track_number>=total_track_number){
@@ -92,73 +78,11 @@ int main(int argc, char  *argv[]){
     //printf("track number:");
     //scanf("%c", &audio_play_input.track_number);
   //}
-  //play(&audio_play_input);
-  pthread_t t1;
-  if (pthread_create(&t1, NULL, produce_data_for_pipe, &audio_play_input)!=0){
-    fprintf(stderr, "Error spawing a new thread\n");
-    return 1;
-  }
-  int buff; 
-  while(read(pipeline[0], &buff, sizeof(int))!=0){
-    fprintf(stderr, "Data received from the pipe(producer): %d\n", buff);
-  }
-  close(pipeline[0]);
-  pw_init(NULL, NULL);
+  pthread_t audio_thread;
+  pthread_create(&audio_thread, 0,play, &audio_play_input);
+  
+  init_pipewire(pipeline[0]);
 
-  PW_Data data={0,};
-  
-  if ((main_loop=pw_main_loop_new(NULL))==NULL){
-    fprintf(stderr, "Failed to acquire a pw main loop\n");
-    return 1;
-  }
-  data.loop=main_loop;
-  data.pipe_read_head=pipeline[0];
-  struct pw_context *context=pw_context_new(pw_main_loop_get_loop(data.loop),NULL, 0);
-  if (context==NULL){
-    fprintf(stderr, "Unable to acquire a pw context\n");
-    return 1;
-  }
-  if ((data.core=pw_context_connect(context, NULL, 0))==NULL){
-    fprintf(stderr, "Unable to connet to pw core deamon\n");
-    return 1;
-  }
-
-  data.stream=pw_stream_new(
-    data.core, "soundboard audio stream", 
-    pw_properties_new(
-      PW_KEY_MEDIA_TYPE, "Audio",
-      PW_KEY_MEDIA_CATEGORY, "Playback",
-      PW_KEY_MEDIA_ROLE, "Music",
-      PW_KEY_NODE_NAME, "Audio source"
-      PW_KEY_NODE_RATE, 44100,
-      NULL)
-  );
-  if (data.stream==NULL){
-    fprintf(stderr, "Unable to create a new pw_stream\n");
-    return 1;
-  }
-  struct spa_hook event_listener;
-  pw_stream_add_listener(data.stream, &event_listener, &stream_events, &data);
-  
-  uint8_t buffer[10024];
-  struct spa_pod_builder b=SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-  const struct spa_pod *param=spa_format_audio_raw_build(&b, SPA_PARAM_EnumFormat,
-                                      &SPA_AUDIO_INFO_RAW_INIT(
-                                        .format=SPA_AUDIO_FORMAT_F32,
-                                        .channels=2,
-                                        .rate=44100)
-                                      );
-  
-  pw_stream_connect(data.stream, 
-                    PW_DIRECTION_OUTPUT,
-                    PW_ID_ANY,
-                    PW_STREAM_FLAG_AUTOCONNECT|
-                    PW_STREAM_FLAG_MAP_BUFFERS|
-                    PW_STREAM_FLAG_RT_PROCESS,
-                    &param, 1);
-  
-  //pw_main_loop_run(data.loop);
-  
   fprintf(stderr, "Closing the programme\n");
   return 0;
 }

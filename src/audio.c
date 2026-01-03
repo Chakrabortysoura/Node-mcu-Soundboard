@@ -166,6 +166,23 @@ int configure_resampler(const int track_number){
   return 0;
 }
 
+void write_to_pipe(const int pipe_write_fd){
+  /*
+   * This function when called reads all the data from the dataframeout and send that data to the pipe
+   * with the pipe_read_fd. As the pipe is configure with nonblocking flag enabled we need to wait until all the data 
+   * can be successfully written.
+   */
+  float data=1;
+  for (int i=0;i<dataframeout->nb_samples*dataframeout->ch_layout.nb_channels;i++){
+    if (write(pipe_write_fd, &data, sizeof(float))<=0){
+      fprintf(stderr, "Failed to write some data to the pipe\n");
+      i--;
+    }else{
+      fprintf(stderr, "Wrote some data to the pipe\n");
+    }
+  }
+}
+
 void * play(void *args){
   /*
     * This function expeects a path to a audio track to play and all the tracks are to labelled as numbers in the 
@@ -281,6 +298,8 @@ void * play(void *args){
           av_frame_unref(dataframeout);
           goto closing;
         }
+        fprintf(stderr, "Got some data to write to the pie\n");
+        write_to_pipe(inputs->pipe_write_head);
         av_frame_unref(dataframeout);
         av_frame_unref(dataframein);
       }
@@ -299,15 +318,3 @@ void * play(void *args){
   
 }
 
-void * produce_data_for_pipe(void *args){
-  PlayInput *input=(PlayInput *) args;
-  fprintf(stderr, "Producer called.\n");
-  for (int i=1;i<200;i++){
-    while (write(input->pipe_write_head, &i,sizeof(int))==0){
-      fprintf(stderr, "Pipe filled with data waiting for the data to be read by the consumer\n");
-    }
-    fprintf(stderr, "Data sent to the consumer: %d\n", i);
-  }
-  close(input->pipe_write_head);
-  return args;
-}
