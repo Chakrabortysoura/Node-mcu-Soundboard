@@ -25,6 +25,7 @@ void on_process(void *data){
    * The main handler for handling the on_process events when triggered by the pipewire deamon.
    * Reads the data coming from the pipe_read_fd and que that for the pipewire server to process.
    */
+  fprintf(stderr, "on_process event called\n");
   PW_Data *userdata=(PW_Data *)data;
   struct pw_buffer *buff;
   if ((buff=pw_stream_dequeue_buffer(userdata->stream))==NULL){
@@ -45,9 +46,9 @@ void on_process(void *data){
   }
   
   uint32_t curr=0;
+  fprintf(stderr, "Starting to read data from the pipe\n");
   while(curr<n_frames){
     if (read(userdata->pipe_read_head, &data_buff[curr], sizeof(float))<=0){
-      fprintf(stderr, "Closing the loop as there seems to be no more data in the pipe\n");
       break;
     }else{
       fprintf(stderr, "Got some data from the pipe\n");
@@ -65,7 +66,8 @@ const struct pw_stream_events stream_events={
     .process=on_process,
 };
 
-void init_pipewire(const int pipe_read_fd){
+void init_pipewire(void *args){
+  int8_t pipe_read_fd=*(int8_t *) args;
   pw_init(NULL, NULL);
   
   if ((payload.loop=pw_main_loop_new(NULL))==NULL){

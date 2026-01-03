@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-int8_t init_pipewire(const int pipe_read_fd);
+void * init_pipewire(void *args);
 
 void deinit_pipewire();
 

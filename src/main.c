@@ -20,6 +20,8 @@ static int pipeline[2];
 
 void termination_handler(int sign){
   fprintf(stderr, "\nTerminating signal handler invoked\n");
+  fclose(stderr);
+  fclose(stdout);
   //pw_main_loop_quit(main_loop); 
   //deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
   fprintf(stderr, "Closing the programme\n");
@@ -78,10 +80,11 @@ int main(int argc, char  *argv[]){
     //printf("track number:");
     //scanf("%c", &audio_play_input.track_number);
   //}
-  pthread_t audio_thread;
-  pthread_create(&audio_thread, 0,play, &audio_play_input);
+
+  pthread_t pw_thread;
+  pthread_create(&pw_thread, 0,init_pipewire, &pipeline[0]);
   
-  init_pipewire(pipeline[0]);
+  play(&audio_play_input);
 
   fprintf(stderr, "Closing the programme\n");
   return 0;

@@ -172,10 +172,10 @@ void write_to_pipe(const int pipe_write_fd){
    * with the pipe_read_fd. As the pipe is configure with nonblocking flag enabled we need to wait until all the data 
    * can be successfully written.
    */
-  float data=1;
   for (int i=0;i<dataframeout->nb_samples*dataframeout->ch_layout.nb_channels;i++){
-    if (write(pipe_write_fd, &data, sizeof(float))<=0){
+    if (write(pipe_write_fd, &dataframeout->data[i], sizeof(float))<=0){
       fprintf(stderr, "Failed to write some data to the pipe\n");
+      sleep(1);
       i--;
     }else{
       fprintf(stderr, "Wrote some data to the pipe\n");
@@ -298,7 +298,6 @@ void * play(void *args){
           av_frame_unref(dataframeout);
           goto closing;
         }
-        fprintf(stderr, "Got some data to write to the pie\n");
         write_to_pipe(inputs->pipe_write_head);
         av_frame_unref(dataframeout);
         av_frame_unref(dataframein);
