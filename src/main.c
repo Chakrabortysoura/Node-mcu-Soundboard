@@ -72,7 +72,7 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   
-  PlayInput audio_play_input={.pipe_write_head=pipeline[1],.track_number=1};
+  //PlayInput audio_play_input={.pipe_write_head=pipeline[1],.track_number=1};
   //printf("track number:");
   //scanf("%" SCNd8, &audio_play_input.track_number);
   //while (audio_play_input.track_number>=total_track_number){
@@ -80,11 +80,11 @@ int main(int argc, char  *argv[]){
     //printf("track number:");
     //scanf("%c", &audio_play_input.track_number);
   //}
-
-  pthread_t pw_thread;
-  pthread_create(&pw_thread, 0,init_pipewire, &pipeline[0]);
+  //play(&audio_play_input);
+  //pthread_t audio_thread;
+  //pthread_create(&audio_thread, 0,play, &audio_play_input);
   
-  play(&audio_play_input);
+  init_pipewire(&pipeline[0]);
 
   fprintf(stderr, "Closing the programme\n");
   return 0;

@@ -172,15 +172,31 @@ void write_to_pipe(const int pipe_write_fd){
    * with the pipe_read_fd. As the pipe is configure with nonblocking flag enabled we need to wait until all the data 
    * can be successfully written.
    */
-  for (int i=0;i<dataframeout->nb_samples*dataframeout->ch_layout.nb_channels;i++){
-    if (write(pipe_write_fd, &dataframeout->data[i], sizeof(float))<=0){
-      fprintf(stderr, "Failed to write some data to the pipe\n");
-      sleep(1);
-      i--;
-    }else{
-      fprintf(stderr, "Wrote some data to the pipe\n");
+  uint32_t data_size=av_samples_get_buffer_size(0, dataframeout->ch_layout.nb_channels, dataframeout->nb_samples, dataframeout->format, 0);
+
+  uint8_t *data_ptr=dataframeout->data[0];
+  uint32_t remaining=data_size;
+
+  while (remaining>0){
+    size_t ret=write(pipe_write_fd, data_ptr, remaining);
+    if (ret>0){
+      data_ptr+=ret;
+      remaining-=ret;
+    }else if (errno==EAGAIN){
+      usleep(1000);
+    }else{ // The error is not due to the pipe having less capacity
+      fprintf(stderr, "Breaking the loop for writing to the pipe\n");
+      break;
     }
   }
+}
+
+int8_t save_to_file(FILE *output){
+  int32_t count=dataframeout->nb_samples*dataframeout->ch_layout.nb_channels;
+  if (fwrite(dataframeout->data[0], sizeof(float), count, output)<count){
+    return -1;
+  }
+  return 0;
 }
 
 void * play(void *args){
@@ -234,7 +250,7 @@ void * play(void *args){
       return inputs;
      }
   }
-  
+  FILE *output=fopen("output.txt", "ab"); 
   pthread_testcancel();  // Another exit point from this function
 
   int err_ret=0;
@@ -307,6 +323,7 @@ void * play(void *args){
   }
    
   closing:
+    fclose(output);
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
     inputs->result=err_ret;

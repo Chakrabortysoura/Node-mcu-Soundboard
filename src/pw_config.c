@@ -25,39 +25,40 @@ void on_process(void *data){
    * The main handler for handling the on_process events when triggered by the pipewire deamon.
    * Reads the data coming from the pipe_read_fd and que that for the pipewire server to process.
    */
-  fprintf(stderr, "on_process event called\n");
   PW_Data *userdata=(PW_Data *)data;
   struct pw_buffer *buff;
   if ((buff=pw_stream_dequeue_buffer(userdata->stream))==NULL){
-    fprintf(stderr, "Error getting buffer to write into from pw server\n");
+    fprintf(stderr, "Out of input buffers for pipewire stream\n");
     return;
   }
   
-  float *data_buff=buff->buffer->datas[0].data;
+  uint8_t *data_buff=buff->buffer->datas[0].data;
   if (data_buff==NULL){
     fprintf(stderr, "There no data buffer allocated inside the pw_buffer\n");
     return;
   }
   
-  uint32_t stride=sizeof(float);
-  uint32_t n_frames=buff->buffer->datas->maxsize/stride;
+  uint32_t stride=sizeof(float)*2; // Because the pw stream in configure with stereo channel layout
+  uint32_t n_frames=buff->buffer->datas[0].maxsize/stride;
   if (buff->requested){
     n_frames=SPA_MIN(n_frames, buff->requested);
   }
-  
-  uint32_t curr=0;
-  fprintf(stderr, "Starting to read data from the pipe\n");
-  while(curr<n_frames){
-    if (read(userdata->pipe_read_head, &data_buff[curr], sizeof(float))<=0){
-      break;
-    }else{
-      fprintf(stderr, "Got some data from the pipe\n");
+  uint32_t required_bytes=stride*n_frames;
+   
+  size_t received_bytes=read(userdata->pipe_read_head, data_buff, required_bytes);
+  if (received_bytes>0){
+    buff->buffer->datas[0].chunk->offset=0;
+    buff->buffer->datas[0].chunk->stride=stride;
+    buff->buffer->datas[0].chunk->size=(uint32_t) received_bytes;
+    if (required_bytes>received_bytes){
+      memset(data_buff+received_bytes, 0, required_bytes-received_bytes);
     }
+    fprintf(stderr, "Received some data from the pipe\n");
+  }else{
+    buff->buffer->datas->chunk->size=0;
+    memset(data_buff, 0, required_bytes);
+    fprintf(stderr, "Didn't receive any data from the pipe. Filling with silence\n");
   }
-
-  buff->buffer->datas->chunk->offset=0;
-  buff->buffer->datas->chunk->stride=stride;
-  buff->buffer->datas->chunk->size=curr*stride;
   pw_stream_queue_buffer(userdata->stream, buff); 
 }
 
