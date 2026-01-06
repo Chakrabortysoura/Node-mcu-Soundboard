@@ -1,7 +1,8 @@
 [
   {
+    "file": "src/audio.c",
     "arguments": [
-      "/usr/bin/clang",
+      "clang",
       "-Wall",
       "-g2",
       "-O0",
@@ -11,17 +12,17 @@
       "-I/usr/include/spa-0.2",
       "-D_REENTRANT",
       "-c",
+      "src/audio.c",
       "-o",
-      "bin/audio.o",
-      "src/audio.c"
+      "bin/audio.o"
     ],
     "directory": "/home/souranil/Source_Code/C/Soundboard",
-    "file": "/home/souranil/Source_Code/C/Soundboard/src/audio.c",
-    "output": "/home/souranil/Source_Code/C/Soundboard/bin/audio.o"
+    "output": "bin/audio.o"
   },
   {
+    "file": "src/config_reader.c",
     "arguments": [
-      "/usr/bin/clang",
+      "clang",
       "-Wall",
       "-g2",
       "-O0",
@@ -31,17 +32,17 @@
       "-I/usr/include/spa-0.2",
       "-D_REENTRANT",
       "-c",
+      "src/config_reader.c",
       "-o",
-      "bin/config_reader.o",
-      "src/config_reader.c"
+      "bin/config_reader.o"
     ],
     "directory": "/home/souranil/Source_Code/C/Soundboard",
-    "file": "/home/souranil/Source_Code/C/Soundboard/src/config_reader.c",
-    "output": "/home/souranil/Source_Code/C/Soundboard/bin/config_reader.o"
+    "output": "bin/config_reader.o"
   },
   {
+    "file": "src/main.c",
     "arguments": [
-      "/usr/bin/clang",
+      "clang",
       "-Wall",
       "-g2",
       "-O0",
@@ -51,17 +52,17 @@
       "-I/usr/include/spa-0.2",
       "-D_REENTRANT",
       "-c",
+      "src/main.c",
       "-o",
-      "bin/main.o",
-      "src/main.c"
+      "bin/main.o"
     ],
     "directory": "/home/souranil/Source_Code/C/Soundboard",
-    "file": "/home/souranil/Source_Code/C/Soundboard/src/main.c",
-    "output": "/home/souranil/Source_Code/C/Soundboard/bin/main.o"
+    "output": "bin/main.o"
   },
   {
+    "file": "src/pw_config.c",
     "arguments": [
-      "/usr/bin/clang",
+      "clang",
       "-Wall",
       "-g2",
       "-O0",
@@ -71,12 +72,31 @@
       "-I/usr/include/spa-0.2",
       "-D_REENTRANT",
       "-c",
+      "src/pw_config.c",
       "-o",
-      "bin/serial_com.o",
-      "src/serial_com.c"
+      "bin/pw_config.o"
     ],
     "directory": "/home/souranil/Source_Code/C/Soundboard",
-    "file": "/home/souranil/Source_Code/C/Soundboard/src/serial_com.c",
-    "output": "/home/souranil/Source_Code/C/Soundboard/bin/serial_com.o"
+    "output": "bin/pw_config.o"
+  },
+  {
+    "file": "src/ring_buff.c",
+    "arguments": [
+      "clang",
+      "-Wall",
+      "-g2",
+      "-O0",
+      "-pthread",
+      "-std=c23",
+      "-I/usr/include/pipewire-0.3",
+      "-I/usr/include/spa-0.2",
+      "-D_REENTRANT",
+      "-c",
+      "src/ring_buff.c",
+      "-o",
+      "bin/ring_buff.o"
+    ],
+    "directory": "/home/souranil/Source_Code/C/Soundboard",
+    "output": "bin/ring_buff.o"
   }
 ]

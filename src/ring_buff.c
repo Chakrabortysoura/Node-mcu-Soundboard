@@ -2,7 +2,6 @@
 // created by souranil on 1/5/2026
 //
 #define _GNU_SOURCE
-#include <stdio.h>
 #include <pthread.h>
 
 #include "ring_buff.h"
@@ -18,21 +17,21 @@ int read_buffer(RingBuffer *ring_buff, float *buff, int n){
   }
   pthread_mutex_lock(&ring_buff->read_head_lock);
   int curr_read=ring_buff->read_head;
-  pthread_mutext_unlock(&ring_buff->read_head_lock);
+  pthread_mutex_unlock(&ring_buff->read_head_lock);
 
   pthread_mutex_lock(&ring_buff->write_head_lock);
   int curr_write=ring_buff->write_head;
-  pthread_mutext_unlock(&ring_buff->write_head_lock);
+  pthread_mutex_unlock(&ring_buff->write_head_lock);
 
   int i=0;
   for (i=0;curr_read<curr_write && i<n;i++){
-    buff[i]=ring_buff[curr_read];
+    buff[i]=ring_buff->buff[curr_read];
     curr_read=(curr_read+1)%MAX_SIZE;
   }
 
   pthread_mutex_lock(&ring_buff->write_head_lock);
   ring_buff->read_head=curr_read;
-  pthread_mutext_unlock(&ring_buff->write_head_lock);
+  pthread_mutex_unlock(&ring_buff->write_head_lock);
   
   return i;
 }
@@ -48,21 +47,21 @@ int write_buffer(RingBuffer *ring_buff, float *buff, int n){
   }
   pthread_mutex_lock(&ring_buff->read_head_lock);
   int curr_read=ring_buff->read_head;
-  pthread_mutext_unlock(&ring_buff->read_head_lock);
+  pthread_mutex_unlock(&ring_buff->read_head_lock);
 
   pthread_mutex_lock(&ring_buff->write_head_lock);
   int curr_write=ring_buff->write_head;
-  pthread_mutext_unlock(&ring_buff->write_head_lock);
+  pthread_mutex_unlock(&ring_buff->write_head_lock);
 
   int i=0;
   for (i=0;curr_write<curr_read && i<n;i++){
-    ring_buff[curr_write]=buff[i];
+    ring_buff->buff[curr_write]=buff[i];
     curr_write=(curr_write+1)%MAX_SIZE;
   }
   
   pthread_mutex_lock(&ring_buff->write_head_lock);
   ring_buff->write_head=curr_write;
-  pthread_mutext_unlock(&ring_buff->write_head_lock);
+  pthread_mutex_unlock(&ring_buff->write_head_lock);
   
   return i;
 }
