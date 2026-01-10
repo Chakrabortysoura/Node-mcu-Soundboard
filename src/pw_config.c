@@ -3,6 +3,7 @@
 //
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <errno.h>
 #include <stdint.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
@@ -45,7 +46,7 @@ void on_process(void *data){
   }
   uint32_t required_bytes=stride*n_frames;
    
-  size_t received_bytes=read(userdata->pipe_read_head, data_buff, required_bytes);
+  ssize_t received_bytes=read(userdata->pipe_read_head, data_buff, required_bytes);
   if (received_bytes>0){
     buff->buffer->datas[0].chunk->offset=0;
     buff->buffer->datas[0].chunk->stride=stride;
@@ -53,12 +54,15 @@ void on_process(void *data){
     if (required_bytes>received_bytes){
       memset(data_buff+received_bytes, 0, required_bytes-received_bytes);
     }
-    fprintf(stderr, "Received some data from the pipe\n");
-  }else{
-    buff->buffer->datas->chunk->size=0;
+    fprintf(stderr, "Received %d bytes of data from the pipe\n", (int) received_bytes);
+  }else if (errno!=EAGAIN){
+    fprintf(stderr, "Some unforseen error happened.Error: %s\n", strerror(errno));
+    buff->buffer->datas[0].chunk->offset=0;
+    buff->buffer->datas[0].chunk->stride=stride;
+    buff->buffer->datas[0].chunk->size=0;
     memset(data_buff, 0, required_bytes);
-    fprintf(stderr, "Didn't receive any data from the pipe. Filling with silence\n");
   }
+
   pw_stream_queue_buffer(userdata->stream, buff); 
 }
 

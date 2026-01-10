@@ -4,6 +4,7 @@
 #define _GNU_SOURCE
 #include "audio.h"
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -99,7 +100,7 @@ int read_audio_file_header(const int track_number){
     return -1;
   } 
   char target_track_path[10];
-  if (sprintf(&target_track_path[0], "%d.flac", track_number)<=0){
+  if (sprintf(&target_track_path[0], "%d.mp3", track_number)<=0){
     fprintf(stderr, "Sprintf error when constructing the name of the target file\n");
     return -1;
   }
@@ -178,25 +179,17 @@ void write_to_pipe(const int pipe_write_fd){
   uint32_t remaining=data_size;
 
   while (remaining>0){
-    size_t ret=write(pipe_write_fd, data_ptr, remaining);
+    ssize_t ret=write(pipe_write_fd, data_ptr, remaining);
     if (ret>0){
       data_ptr+=ret;
       remaining-=ret;
-    }else if (errno==EAGAIN){
-      usleep(1000);
-    }else{ // The error is not due to the pipe having less capacity
-      fprintf(stderr, "Breaking the loop for writing to the pipe\n");
+      fprintf(stderr, "Wrote %d bytes to the pipe.\n", (int) ret);
+    }else if (errno!=EAGAIN){
+      // The error is not due to the pipe having less capacity
+      fprintf(stderr, "Breaking the loop for some unforseen error in the pipeline.Error: %s\n", strerror(errno));
       break;
     }
   }
-}
-
-int8_t save_to_file(FILE *output){
-  int32_t count=dataframeout->nb_samples*dataframeout->ch_layout.nb_channels;
-  if (fwrite(dataframeout->data[0], sizeof(float), count, output)<count){
-    return -1;
-  }
-  return 0;
 }
 
 void * play(void *args){
@@ -217,7 +210,7 @@ void * play(void *args){
   fprintf(stderr, "Input track number received: %d\n", track_number);
 
   char target_track_path[10];
-  if (sprintf(&target_track_path[0], "%d.flac", track_number)<=0){
+  if (sprintf(&target_track_path[0], "%d.mp3", track_number)<=0){
     fprintf(stderr, "Aborting the play function. Internal error with the sprintf() function\n");
     inputs->result=-1;
     pthread_mutex_lock(&inputs->state_var_mutex);
@@ -250,7 +243,6 @@ void * play(void *args){
       return inputs;
      }
   }
-  FILE *output=fopen("output.txt", "ab"); 
   pthread_testcancel();  // Another exit point from this function
 
   int err_ret=0;
@@ -259,7 +251,7 @@ void * play(void *args){
     err_ret=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
     if (err_ret==AVERROR_EOF){ // Handle the last demuxing error that happened at the time of while loop end
       fprintf(stderr, "End of File reached: %s. Completed decoding of the whole File.\n", target_track_path);
-      break;
+      goto closing;
     }else if (err_ret!=0){
       fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, err_ret);
       goto closing;
@@ -301,11 +293,7 @@ void * play(void *args){
 
         err_ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
         if (err_ret!=0){
-          if (err_ret==AVERROR_INPUT_CHANGED){
-            fprintf(stderr, "Error with the input config\n");
-          }else if (err_ret==AVERROR_OUTPUT_CHANGED){
-            fprintf(stderr, "Error with the output config\n");
-          }else{
+          if (err_ret!=AVERROR_EOF){
             fprintf(stderr, "Error while converting frames using resampler. Error: %d\n", err_ret); //Error while configuring resampler so aborting the process entirely
           }
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
@@ -314,6 +302,7 @@ void * play(void *args){
           av_frame_unref(dataframeout);
           goto closing;
         }
+
         write_to_pipe(inputs->pipe_write_head);
         av_frame_unref(dataframeout);
         av_frame_unref(dataframein);
@@ -321,9 +310,8 @@ void * play(void *args){
     }
     av_packet_unref(datapacket);// clean the packet after use
   }
-   
+
   closing:
-    fclose(output);
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
     inputs->result=err_ret;

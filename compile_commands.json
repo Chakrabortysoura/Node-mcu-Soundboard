@@ -80,7 +80,7 @@
     "output": "bin/pw_config.o"
   },
   {
-    "file": "src/ring_buff.c",
+    "file": "src/serial_com.c",
     "arguments": [
       "clang",
       "-Wall",
@@ -92,11 +92,11 @@
       "-I/usr/include/spa-0.2",
       "-D_REENTRANT",
       "-c",
-      "src/ring_buff.c",
+      "src/serial_com.c",
       "-o",
-      "bin/ring_buff.o"
+      "bin/serial_com.o"
     ],
     "directory": "/home/souranil/Source_Code/C/Soundboard",
-    "output": "bin/ring_buff.o"
+    "output": "bin/serial_com.o"
   }
 ]
