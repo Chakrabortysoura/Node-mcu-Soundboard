@@ -7,8 +7,18 @@
 
 #include <stdint.h>
 
-int64_t index(const char *str, const char search_term);
+#include "String.h"
 
-int split_in_two(const char *src, char * target_buffer[2], const char splitter);
+typedef struct{
+	// Struct to hold the provided names for each input coming from the serial input device
+	const uint8_t *total_number_of_inputs;	
+	String **filename_arr;
+}AudioMappings; 
+
+int split_in_two(const char *src, String **target_buffer, const char splitter);
+
+AudioMappings * init_audio_mapping(const uint8_t number_of_inputs);
+
+int8_t add_new_mapping(AudioMappings *map, const char *config_line);
 
 #endif

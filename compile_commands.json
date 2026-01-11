@@ -98,5 +98,25 @@
     ],
     "directory": "/home/souranil/Source_Code/C/Soundboard",
     "output": "bin/serial_com.o"
+  },
+  {
+    "file": "src/String.c",
+    "arguments": [
+      "clang",
+      "-Wall",
+      "-g2",
+      "-O0",
+      "-pthread",
+      "-std=c23",
+      "-I/usr/include/pipewire-0.3",
+      "-I/usr/include/spa-0.2",
+      "-D_REENTRANT",
+      "-c",
+      "src/String.c",
+      "-o",
+      "bin/String.o"
+    ],
+    "directory": "/home/souranil/Source_Code/C/Soundboard",
+    "output": "bin/String.o"
   }
 ]
