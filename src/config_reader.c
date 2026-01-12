@@ -44,9 +44,16 @@ int split_in_two(const char *src, String **target_buffer, const char splitter){
 AudioMappings * init_audio_mapping(const uint8_t number_of_inputs){
     //Initialize the audiomappings struct with the given number of total possible mappings
     AudioMappings *newobj=(AudioMappings *) calloc(1, sizeof(AudioMappings));
-    if (newobj!=NULL){
-        newobj->total_number_of_inputs=&number_of_inputs;
-        newobj->filename_arr=(String *)calloc(number_of_inputs, sizeof(String));
+    if (newobj==NULL){
+        fprintf(stderr, "AudioMapping allocation failed. Error: %s\n", strerror(errno));
+        return NULL; 
+    }
+    newobj->total_number_of_inputs=&number_of_inputs;
+    newobj->filename_arr=(String **)calloc(number_of_inputs, sizeof(String *));
+    if (newobj->filename_arr==NULL){
+        fprintf(stderr, "String buffer allocation failed during AudioMapping allocation. Error: %s\n", strerror(errno));
+        free(newobj);
+        return NULL;
     }
     return newobj;
 }
