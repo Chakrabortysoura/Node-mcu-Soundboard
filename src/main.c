@@ -74,9 +74,9 @@ int main(int argc, char  *argv[]){
   }
   
   const char *teststr="1:audio.mp3";
-  String *str1=NULL;
-  uint8_t input=split_in_two(teststr, &str1, ':');
-  fprintf(stderr, "Key: %d, Filepath: %s\n", input, str1->str);   
+  AudioMappings *configdata=init_audio_mapping(total_track_number);
+  add_new_mapping(configdata, teststr);
+  fprintf(stderr, "The filepath associated with the input=> 1: %s\n", configdata->filename_arr[0]->str); 
 
   fprintf(stderr, "Closing the programme\n");
   return 0;

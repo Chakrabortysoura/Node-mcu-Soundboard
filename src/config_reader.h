@@ -15,10 +15,8 @@ typedef struct{
 	String **filename_arr;
 }AudioMappings; 
 
-int split_in_two(const char *src, String **target_buffer, const char splitter);
-
 AudioMappings * init_audio_mapping(const uint8_t number_of_inputs);
 
-int8_t add_new_mapping(AudioMappings *map, const char *config_line);
+int8_t add_new_mapping(AudioMappings *configs, const char *line);
 
 #endif

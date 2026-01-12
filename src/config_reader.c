@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "config_reader.h"
 #include "String.h"
@@ -23,22 +24,34 @@ int64_t index(const char *str, const char search_term){
     return (int64_t) total_len-split_len;
 }
 
-int split_in_two(const char *src, String **target_buffer, const char splitter){
+uint8_t extract_right_side(const char *src, String **target_buffer, const char splitter){
     /*
-    * Split the given src string in two parts at the splitter char idx. This function does check if the splitter
-    * char is in the string or not. Destination string buffer should be a 2d buffer containing enough space for two 300 char strings.
+     * Split the given src string at the splitter character and copy the right side of the split string in the target_buffer.
+     * Return: -ve return value for any internal error and 0 when successful.
     */
     int64_t split_idx=index(src, splitter);
     if (split_idx<0){
         fprintf(stderr, "The splitting character was not found in the source string.\n");
         return -1;
     }
-    uint8_t key=atoi(src);
     *target_buffer=init_string_from_src(src+split_idx+1);
     if (target_buffer==NULL){
+        fprintf(stderr, "Unable to copy the split string.\n");
+        return -2;
+    }
+    return 0;
+}
+
+int8_t add_new_mapping(AudioMappings *configs, const char *line){
+    int8_t input_number=atoi(line); 
+    if (input_number>*configs->total_number_of_inputs && input_number<0){
+        fprintf(stderr, "Please provide valid number to map audio file to: %s\n", line);
         return -1;
     }
-    return key;
+    if (extract_right_side(line, &configs->filename_arr[input_number-1], ':')!=0){
+        return -2;
+    }
+    return 0;
 }
 
 AudioMappings * init_audio_mapping(const uint8_t number_of_inputs){
@@ -58,7 +71,3 @@ AudioMappings * init_audio_mapping(const uint8_t number_of_inputs){
     return newobj;
 }
 
-uint8_t add_new_mapping(AudioMappings *config_data, const char *line){
-     
-    return 0;
-}
