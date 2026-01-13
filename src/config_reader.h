@@ -11,7 +11,7 @@
 
 typedef struct{
 	// Struct to hold the provided names for each input coming from the serial input device
-	const uint8_t *total_number_of_inputs;	
+	uint8_t total_number_of_inputs;	
 	String **filename_arr;
 }AudioMappings; 
 

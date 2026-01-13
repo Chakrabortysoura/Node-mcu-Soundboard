@@ -40,11 +40,10 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   if (chdir(homepath)!=0){ //Always start at the users home directoryf;
-    fprintf(stderr, "Error in changing the base directory: %s\n", strerror(errno));
-    fprintf(stderr, "Provided path: %s\n", homepath);
+    fprintf(stderr, "Error in changing the base directory: %s\nProvided path: %s\n", strerror(errno), homepath);
     return 1;
   }
-
+  
   total_track_number=6;
   char *serial_port;
   for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
@@ -67,17 +66,41 @@ int main(int argc, char  *argv[]){
       }
     }
   }
+  
+  /*
+    * Read and parse the configdata provided int the default config file path. 
+    * Right now custom config file paths are not acceptable from the command line arguments.
+    */
+  AudioMappings *config=init_audio_mapping(total_track_number);
+  if (config==NULL){
+    return 1;
+  }
+  FILE *config_file=fopen("config.txt", "r");
+  if (config_file==NULL){
+    fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
+    return 1;
+  }
+  size_t len=0;
+  char *buffer=calloc(len, sizeof(char));
+  if (buffer==NULL){
+    fprintf(stderr, "Error allocating string buffer for reading context file. Error: %s\n", strerror(errno));
+    return 1;
+  }
+  while (getline(&buffer, &len, config_file)>0){
+    char *newline_idx=strchr(buffer, '\n');
+    if (newline_idx!=NULL){
+      *newline_idx='\0';
+    }
+    add_new_mapping(config, buffer);
+    free(buffer);
+  }
+  fclose(config_file);
 
   if (pipe2(pipeline, O_NONBLOCK)!=0){ // Initiate the pipe file descriptor
     fprintf(stderr, "Error while creating pipe for sending the pipewire server data");
     return 1;
   }
-  
-  const char *teststr="1:audio.mp3";
-  AudioMappings *configdata=init_audio_mapping(total_track_number);
-  add_new_mapping(configdata, teststr);
-  fprintf(stderr, "The filepath associated with the input=> 1: %s\n", configdata->filename_arr[0]->str); 
-
-  fprintf(stderr, "Closing the programme\n");
+   
+  fprintf(stderr, "\nClosing the programme\n");
   return 0;
 }

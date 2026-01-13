@@ -44,7 +44,7 @@ uint8_t extract_right_side(const char *src, String **target_buffer, const char s
 
 int8_t add_new_mapping(AudioMappings *configs, const char *line){
     int8_t input_number=atoi(line); 
-    if (input_number>*configs->total_number_of_inputs && input_number<0){
+    if (input_number>configs->total_number_of_inputs && input_number<0){
         fprintf(stderr, "Please provide valid number to map audio file to: %s\n", line);
         return -1;
     }
@@ -61,7 +61,7 @@ AudioMappings * init_audio_mapping(const uint8_t number_of_inputs){
         fprintf(stderr, "AudioMapping allocation failed. Error: %s\n", strerror(errno));
         return NULL; 
     }
-    newobj->total_number_of_inputs=&number_of_inputs;
+    newobj->total_number_of_inputs=number_of_inputs;
     newobj->filename_arr=(String **)calloc(number_of_inputs, sizeof(String *));
     if (newobj->filename_arr==NULL){
         fprintf(stderr, "String buffer allocation failed during AudioMapping allocation. Error: %s\n", strerror(errno));
