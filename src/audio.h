@@ -13,7 +13,7 @@ typedef struct{
 	// function and using the struct reference. 
 	
 	pthread_mutex_t track_input_mutex;
-	int8_t track_number;
+	uint8_t track_number;
 
 	int8_t result;
 

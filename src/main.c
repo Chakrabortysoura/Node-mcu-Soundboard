@@ -14,6 +14,8 @@
 
 #include "audio.h"
 #include "config_reader.h"
+#include "pw_config.h"
+#include "serial_com.h"
 
 #define SERIAL_INPUT_MAPPING_FILE "serial_config.txt"
 
@@ -21,7 +23,6 @@ static int8_t total_track_number;
 static int pipeline[2];
 
 void termination_handler(int sign){
-  fprintf(stderr, "\nTerminating signal handler invoked\n");
   deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
   fprintf(stderr, "Closing the programme\n");
   exit(0);
@@ -45,7 +46,7 @@ int main(int argc, char  *argv[]){
   }
   
   total_track_number=6;
-  char *serial_port;
+  char *serial_port=NULL;
   for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
     if (strcmp(argv[i], "--err")==0 && i+1<argc){
       fclose(stderr);
@@ -80,7 +81,7 @@ int main(int argc, char  *argv[]){
     fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
     return 1;
   }
-  size_t len=0;
+  size_t len=1024;
   char *buffer=calloc(len, sizeof(char));
   if (buffer==NULL){
     fprintf(stderr, "Error allocating string buffer for reading context file. Error: %s\n", strerror(errno));
@@ -92,15 +93,34 @@ int main(int argc, char  *argv[]){
       *newline_idx='\0';
     }
     add_new_mapping(config, buffer);
-    free(buffer);
   }
   fclose(config_file);
-
+  free(buffer);
   if (pipe2(pipeline, O_NONBLOCK)!=0){ // Initiate the pipe file descriptor
     fprintf(stderr, "Error while creating pipe for sending the pipewire server data");
     return 1;
   }
-   
+  //pthread_t t1;
+  //if (pthread_create(&t1, 0, init_pipewire, &pipeline[0])!=0){
+    //fprintf(stderr, "Launching pipewire failed.\n");
+    //return 1;
+  //}
+  //fprintf(stderr, "Started the pipewire stream.\n");
+  //if (serial_port==NULL){
+    //fprintf(stderr, "Serial device port not given.\n");
+    //return 1;
+  //}
+  //int port=init_serial_port(serial_port);
+  //if (port==-1){
+    //return 1;
+  //}
+  //uint8_t serialdata=0; 
+  if (init_av_objects(total_track_number)!=0){
+    fprintf(stderr, "Error initializing all the av objects\n");
+    return 1;
+  }
+  PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false}; 
+  play(&audio_input); 
   fprintf(stderr, "\nClosing the programme\n");
   return 0;
 }

@@ -199,34 +199,34 @@ void * play(void *args){
   */
   PlayInput *inputs=(PlayInput *)args; 
   
-  pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
+  //pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
-  pthread_mutex_unlock(&inputs->track_input_mutex);
+  //pthread_mutex_unlock(&inputs->track_input_mutex);
   
-  pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running by the shared variable
+  //pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running by the shared variable
   inputs->is_running=true;
-  pthread_mutex_unlock(&inputs->state_var_mutex);
+  //pthread_mutex_unlock(&inputs->state_var_mutex);
 
   fprintf(stderr, "Input track number received: %d\n", track_number);
 
   char target_track_path[10];
-  if (sprintf(&target_track_path[0], "%d.mp3", track_number)<=0){
+  if (sprintf(&target_track_path[0], "%d.flac", track_number)<=0){
     fprintf(stderr, "Aborting the play function. Internal error with the sprintf() function\n");
     inputs->result=-1;
-    pthread_mutex_lock(&inputs->state_var_mutex);
+    //pthread_mutex_lock(&inputs->state_var_mutex);
     inputs->is_running=false;
-    pthread_mutex_unlock(&inputs->state_var_mutex);
+    //pthread_mutex_unlock(&inputs->state_var_mutex);
     return inputs;
   }
-  
+   
   pthread_testcancel();  
   if (trackcontext_buffer[track_number-1]==NULL){ 
     if (read_audio_file_header(track_number)!=0){
       fprintf(stderr, "Aborting the play function. Error in reading audio file header data\n");
       inputs->result=-1;
-      pthread_mutex_lock(&inputs->state_var_mutex);
+      //pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
-      pthread_mutex_unlock(&inputs->state_var_mutex);
+      //pthread_mutex_unlock(&inputs->state_var_mutex);
       return inputs;
     }
   }
@@ -237,9 +237,9 @@ void * play(void *args){
      if (get_avcodec_decoder(track_number)!=0){
       fprintf(stderr, "Aborting the play function. Error in getting the decoders for the audio file streams.\n");
       inputs->result=-1;
-      pthread_mutex_lock(&inputs->state_var_mutex);
+      //pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
-      pthread_mutex_unlock(&inputs->state_var_mutex);
+      //pthread_mutex_unlock(&inputs->state_var_mutex);
       return inputs;
      }
   }
@@ -315,9 +315,9 @@ void * play(void *args){
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
     inputs->result=err_ret;
-    pthread_mutex_lock(&inputs->state_var_mutex);
+    //pthread_mutex_lock(&inputs->state_var_mutex);
     inputs->is_running=false;
-    pthread_mutex_unlock(&inputs->state_var_mutex);
+    //pthread_mutex_unlock(&inputs->state_var_mutex);
     return inputs;
   
 }

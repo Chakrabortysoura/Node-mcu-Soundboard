@@ -73,6 +73,7 @@ const struct pw_stream_events stream_events={
 
 void init_pipewire(void *args){
   int8_t pipe_read_fd=*(int8_t *) args;
+  fprintf(stderr, "unix pipe file descriptor: %d\n", pipe_read_fd);
   pw_init(NULL, NULL);
   
   if ((payload.loop=pw_main_loop_new(NULL))==NULL){
@@ -123,7 +124,6 @@ void init_pipewire(void *args){
                     &payload.param, 1);
   
   pw_main_loop_run(payload.loop);
-  return;
 }
 
 void deinit_pipewire(){

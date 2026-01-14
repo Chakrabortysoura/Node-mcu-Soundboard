@@ -22,15 +22,15 @@ int init_serial_port(const char *serial_port_path){
    * from the serial port.
   */
 
-  const int serial_port_fd=open(serial_port_path ,O_RDONLY|O_NONBLOCK|O_NOCTTY); // File descriptor obtained for the usb to com port used for communicating with the nodemcu
+  const int serial_port_fd=open(serial_port_path ,O_RDONLY|O_NOCTTY); // File descriptor obtained for the usb to com port used for communicating with the nodemcu
   if (serial_port_fd<=0) { // Exit the programme when the serial port file descriptor couldn't be obtained
     perror(strerror(errno));
-    exit(1);
+    return -1;
   }
   struct termios port_config;
   if (tcgetattr(serial_port_fd, &port_config)==-1){// Get the termios struct associated with serial port
     perror(strerror(errno));
-    exit(1);
+    return -1;
   }
   
   port_config.c_iflag&= ~(INPCK); // Configure the control flag values in for the serial port file descriptor
@@ -41,11 +41,11 @@ int init_serial_port(const char *serial_port_path){
 
   if (tcsetattr(serial_port_fd, TCSANOW, &port_config )==-1){// Set the new serial port config
     perror(strerror(errno));
-    exit(1);
+    return -1;
   }
   if (tcflush(serial_port_fd, TCIOFLUSH)!=0){ //Flush any previous data in the input buffer for the serial port
     perror("Serial port queue flush Error");
-    exit(1);
+    return -1;
   }
   
   return serial_port_fd;
