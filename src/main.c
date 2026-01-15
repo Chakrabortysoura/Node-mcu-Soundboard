@@ -17,13 +17,14 @@
 #include "pw_config.h"
 #include "serial_com.h"
 
-#define SERIAL_INPUT_MAPPING_FILE "serial_config.txt"
+#define SERIAL_INPUT_MAPPING_FILE "config.txt"
 
 static int8_t total_track_number;
 static int pipeline[2];
 
 void termination_handler(int sign){
   deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
+  deinit_pipewire();
   fprintf(stderr, "Closing the programme\n");
   exit(0);
 }
@@ -96,31 +97,57 @@ int main(int argc, char  *argv[]){
   }
   fclose(config_file);
   free(buffer);
+
+  /*
+  * Initialize the Unix pipes for inter thread communication between the main thread decoding and resampling audio streams
+  * and the pipewire stream that is consuming the data coming for playback.
+  */
   if (pipe2(pipeline, O_NONBLOCK)!=0){ // Initiate the pipe file descriptor
     fprintf(stderr, "Error while creating pipe for sending the pipewire server data");
     return 1;
   }
-  //pthread_t t1;
-  //if (pthread_create(&t1, 0, init_pipewire, &pipeline[0])!=0){
-    //fprintf(stderr, "Launching pipewire failed.\n");
-    //return 1;
-  //}
-  //fprintf(stderr, "Started the pipewire stream.\n");
-  //if (serial_port==NULL){
-    //fprintf(stderr, "Serial device port not given.\n");
-    //return 1;
-  //}
-  //int port=init_serial_port(serial_port);
-  //if (port==-1){
-    //return 1;
-  //}
-  //uint8_t serialdata=0; 
+  
+  /*
+   * Initialize the pipewire config and connnect the stream with the help of the context object 
+   * on a seperate thread so as to not block the main function execution.
+    */
+  pthread_t t1;
+  if (pthread_create(&t1, 0, init_pipewire, &pipeline[0])!=0){
+    fprintf(stderr, "Launching pipewire failed.\n");
+    return 1;
+  }
+  
+  /*
+  * Initialize the ffmpeg audio processing header.
+  */
   if (init_av_objects(total_track_number)!=0){
     fprintf(stderr, "Error initializing all the av objects\n");
     return 1;
   }
+  
+  /*
+  * Configure the serial port for io with the given path to the serial device.
+  */
+  if (serial_port==NULL){
+    fprintf(stderr, "Please provide a address for the serial input device.\n");
+    return 1;
+  }
+  int serial_port_fd=init_serial_port(serial_port);
+  if (serial_port_fd<=0){
+    fprintf(stderr, "Error configuring serial port device.\n");
+  }
+
   PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false}; 
-  play(&audio_input); 
+  uint8_t input;
+  while(true){
+    if (read(serial_port_fd, &input, 1)>0){
+      fprintf(stderr, "Serial input received playing the default honking sound.\n");
+      play(&audio_input);
+    }
+  }
+
   fprintf(stderr, "\nClosing the programme\n");
+  deinit_pipewire();
+  deinit_av_objects(total_track_number);
   return 0;
 }
