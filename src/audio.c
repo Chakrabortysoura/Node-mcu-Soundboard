@@ -88,7 +88,7 @@ void deinit_av_objects(const int total_track_number){
   free(track_stream_ctx_buffer);
 }
 
-int read_audio_file_header(const int track_number){
+int read_audio_file_header(const char *track_path){
   /*
    * Wrapper function to guess the audio format for the designated track(from the track number given) 
    * and read and allocate AVFormatContext for it and inspect the audio file stream info.
@@ -99,12 +99,8 @@ int read_audio_file_header(const int track_number){
     fprintf(stderr, "AVFormat context allocation failed for track number: %d\n", track_number);
     return -1;
   } 
-  char target_track_path[10];
-  if (sprintf(&target_track_path[0], "%d.mp3", track_number)<=0){
-    fprintf(stderr, "Sprintf error when constructing the name of the target file\n");
-    return -1;
-  }
-  if ((avformat_open_input(&trackcontext_buffer[track_number-1], target_track_path, NULL, NULL))!=0){
+  
+  if ((avformat_open_input(&trackcontext_buffer[track_number-1], track_path, NULL, NULL))!=0){
     fprintf(stderr, "Error when trying to open the audio file: %s\n", target_track_path);
     return -1;
   }
@@ -208,20 +204,10 @@ void * play(void *args){
   //pthread_mutex_unlock(&inputs->state_var_mutex);
 
   fprintf(stderr, "Input track number received: %d\n", track_number);
-
-  char target_track_path[10];
-  if (sprintf(&target_track_path[0], "%d.flac", track_number)<=0){
-    fprintf(stderr, "Aborting the play function. Internal error with the sprintf() function\n");
-    inputs->result=-1;
-    //pthread_mutex_lock(&inputs->state_var_mutex);
-    inputs->is_running=false;
-    //pthread_mutex_unlock(&inputs->state_var_mutex);
-    return inputs;
-  }
    
   pthread_testcancel();  
   if (trackcontext_buffer[track_number-1]==NULL){ 
-    if (read_audio_file_header(track_number)!=0){
+    if (read_audio_file_header(config->filename_arr[track_number-1]->str)!=0){
       fprintf(stderr, "Aborting the play function. Error in reading audio file header data\n");
       inputs->result=-1;
       //pthread_mutex_lock(&inputs->state_var_mutex);
