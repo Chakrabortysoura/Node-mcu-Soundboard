@@ -88,7 +88,7 @@ void deinit_av_objects(const int total_track_number){
   free(track_stream_ctx_buffer);
 }
 
-int read_audio_file_header(const char *track_path){
+int read_audio_file_header(const int track_number, const char *track_path){
   /*
    * Wrapper function to guess the audio format for the designated track(from the track number given) 
    * and read and allocate AVFormatContext for it and inspect the audio file stream info.
@@ -101,11 +101,11 @@ int read_audio_file_header(const char *track_path){
   } 
   
   if ((avformat_open_input(&trackcontext_buffer[track_number-1], track_path, NULL, NULL))!=0){
-    fprintf(stderr, "Error when trying to open the audio file: %s\n", target_track_path);
+    fprintf(stderr, "Error when trying to open the audio file: %s\n", track_path);
     return -1;
   }
   if (avformat_find_stream_info(trackcontext_buffer[track_number-1], NULL)<0){
-    fprintf(stderr, "Error inspecting stream information for the audio trcak: %s\n", target_track_path);
+    fprintf(stderr, "Error inspecting stream information for the audio trcak: %s\n", track_path);
     return -1;
   }
   av_dump_format(trackcontext_buffer[track_number-1], -1, NULL, 0);
@@ -197,6 +197,7 @@ void * play(void *args){
   
   //pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
+  char *target_track_path=inputs->config->filename_arr[track_number-1]->str;
   //pthread_mutex_unlock(&inputs->track_input_mutex);
   
   //pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running by the shared variable
@@ -207,7 +208,7 @@ void * play(void *args){
    
   pthread_testcancel();  
   if (trackcontext_buffer[track_number-1]==NULL){ 
-    if (read_audio_file_header(config->filename_arr[track_number-1]->str)!=0){
+    if (read_audio_file_header(track_number, target_track_path)!=0){
       fprintf(stderr, "Aborting the play function. Error in reading audio file header data\n");
       inputs->result=-1;
       //pthread_mutex_lock(&inputs->state_var_mutex);
@@ -263,7 +264,7 @@ void * play(void *args){
         }
 
         /*
-        * If the swrcontext resampler is non intialized at the start of decoding an audio frame configure it and initialize the resampler.
+        * If the swrctarget_track_path start of decoding an audio frame configure it and initialize the resampler.
         * This reconfiguration is done with the configure_resampler() helper function. 
         */
         if (!swr_is_initialized(resampler) && configure_resampler(track_number)!=0){

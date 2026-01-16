@@ -23,9 +23,9 @@ static int8_t total_track_number;
 static int pipeline[2];
 
 void termination_handler(int sign){
+  fprintf(stderr, "Closing the programme\n");
   deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
   deinit_pipewire();
-  fprintf(stderr, "Closing the programme\n");
   exit(0);
 }
 
@@ -73,8 +73,8 @@ int main(int argc, char  *argv[]){
     * Read and parse the configdata provided int the default config file path. 
     * Right now custom config file paths are not acceptable from the command line arguments.
     */
-  AudioMappings *config=init_audio_mapping(total_track_number);
-  if (config==NULL){
+  AudioMappings *config_map=init_audio_mapping(total_track_number);
+  if (config_map==NULL){
     return 1;
   }
   FILE *config_file=fopen("config.txt", "r");
@@ -93,7 +93,7 @@ int main(int argc, char  *argv[]){
     if (newline_idx!=NULL){
       *newline_idx='\0';
     }
-    add_new_mapping(config, buffer);
+    add_new_mapping(config_map, buffer);
   }
   fclose(config_file);
   free(buffer);
@@ -137,7 +137,7 @@ int main(int argc, char  *argv[]){
     fprintf(stderr, "Error configuring serial port device.\n");
   }
 
-  PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false}; 
+  PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false, .config=config_map}; 
   uint8_t input;
   while(true){
     if (read(serial_port_fd, &input, 1)>0){
