@@ -8,23 +8,20 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#include "config_reader.h"
+
 typedef struct{
 	// PlayInput struct now contains an is_running flag to notify if there is any thread running currently the play
 	// function and using the struct reference. 
-	
 	pthread_mutex_t track_input_mutex;
 	uint8_t track_number;
-
 	int8_t result;
-
 	pthread_mutex_t state_var_mutex; // Mutex to handle reading and writing of the is_running boolean that indicates the state of the threads 
 	// as that is read and written to by both the main thread and the audio thread
 	bool is_running;
-	
+	AudioMappings *config; // Config data to map serial input to particular audio file tracks' paths.
 	int pipe_write_head; // File descriptor for the write head of the pipe that is used to send resampled decoded frame audio data to the pipewire server process.
-
 }PlayInput;
-
 
 void *play(void *args);
 
