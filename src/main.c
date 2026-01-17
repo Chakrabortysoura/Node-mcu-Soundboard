@@ -22,7 +22,7 @@
 static int8_t total_track_number;
 static int pipeline[2];
 
-void termination_handler(int sign){
+void termination_handler(int signal){
   fprintf(stderr, "Closing the programme\n");
   deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
   deinit_pipewire();
@@ -48,7 +48,7 @@ int main(int argc, char  *argv[]){
   
   total_track_number=6;
   char *serial_port=NULL;
-  for(int i=1;i<argc;i++){ // Command line args parser to parse through the args
+  for(int i=1;i<argc;i++){ // Command line args parser to initilize the necessary configuration variables
     if (strcmp(argv[i], "--err")==0 && i+1<argc){
       fclose(stderr);
       stderr=fopen(argv[i+1], "a");
@@ -141,7 +141,8 @@ int main(int argc, char  *argv[]){
   uint8_t input;
   while(true){
     if (read(serial_port_fd, &input, 1)>0){
-      fprintf(stderr, "Serial input received playing the default honking sound.\n");
+      audio_input.track_number=input-(int)'0';
+      fprintf(stderr, "Serial input data received: %d\n", audio_input.track_number);
       play(&audio_input);
     }
   }

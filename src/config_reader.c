@@ -44,8 +44,12 @@ uint8_t extract_right_side(const char *src, String **target_buffer, const char s
 
 int8_t add_new_mapping(AudioMappings *configs, const char *line){
     int8_t input_number=atoi(line); 
-    if (input_number>configs->total_number_of_inputs && input_number<0){
+    if (input_number>configs->total_number_of_inputs || input_number<=0){
         fprintf(stderr, "Please provide valid number to map audio file to: %s\n", line);
+        return -1;
+    }
+    if (configs->filename_arr[input_number-1]!=NULL){
+        fprintf(stderr, "Already a audio file mapping exist for this serial input.\n");
         return -1;
     }
     if (extract_right_side(line, &configs->filename_arr[input_number-1], ':')!=0){

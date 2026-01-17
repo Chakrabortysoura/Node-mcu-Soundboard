@@ -197,6 +197,16 @@ void * play(void *args){
   
   //pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
+  if (track_number<=0 && track_number>inputs->config->total_number_of_inputs){
+    fprintf(stderr, "The given input is outside the predefine inputs.\n");
+    inputs->result=-1;
+    return inputs;
+  }
+  if (inputs->config->filename_arr[track_number-1]==NULL){
+    fprintf(stderr, "Audio filepath is not mapped in the config for input: %d\n", track_number);
+    inputs->result=-1;
+    return inputs;
+  }
   char *target_track_path=inputs->config->filename_arr[track_number-1]->str;
   //pthread_mutex_unlock(&inputs->track_input_mutex);
   
