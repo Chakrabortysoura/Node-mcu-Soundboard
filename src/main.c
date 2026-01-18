@@ -111,12 +111,12 @@ int main(int argc, char  *argv[]){
    * Initialize the pipewire config and connnect the stream with the help of the context object 
    * on a seperate thread so as to not block the main function execution.
     */
-  pthread_t t1;
-  if (pthread_create(&t1, 0, init_pipewire, &pipeline[0])!=0){
-    fprintf(stderr, "Launching pipewire failed.\n");
-    return 1;
-  }
-  
+  //pthread_t pw_thread;
+  //if (pthread_create(&pw_thread, 0, init_pipewire, &pipeline[0])!=0){
+    //fprintf(stderr, "Launching pipewire failed.\n");
+    //return 1;
+  //}
+  init_pipewire(&(pipeline[0])); 
   /*
   * Initialize the ffmpeg audio processing header.
   */
@@ -137,15 +137,15 @@ int main(int argc, char  *argv[]){
     fprintf(stderr, "Error configuring serial port device.\n");
   }
 
-  PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false, .config=config_map}; 
-  uint8_t input;
-  while(true){
-    if (read(serial_port_fd, &input, 1)>0){
-      audio_input.track_number=input-(int)'0';
-      fprintf(stderr, "Serial input data received: %d\n", audio_input.track_number);
-      play(&audio_input);
-    }
-  }
+  //PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false, .config=config_map}; 
+  //uint8_t input;
+  //while(true){
+    //if (read(serial_port_fd, &input, 1)>0){
+      //audio_input.track_number=input-(int)'0';
+      //fprintf(stderr, "Serial input data received: %d\n", audio_input.track_number);
+      //play(&audio_input);
+    //}
+  //}
 
   fprintf(stderr, "\nClosing the programme\n");
   deinit_pipewire();

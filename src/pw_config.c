@@ -9,19 +9,22 @@
 #include <spa/param/audio/format-utils.h>
 #include <spa/utils/defs.h>
 
+#include "pw_config.h"
+
 typedef struct{
   struct pw_main_loop *loop;
   struct pw_core *core;
   struct pw_stream *stream;
+  struct pw_registry *registry;
   struct pw_context *context;
-  struct spa_hook event_listener;
+  struct spa_hook event_listener,registry_listener;
   const struct spa_pod *param;
   int pipe_read_head;
 }PW_Data;
 
 static PW_Data payload;
 
-void on_process(void *data){
+void on_stream_process(void *data){
   /*
    * The main handler for handling the on_process events when triggered by the pipewire deamon.
    * Reads the data coming from the pipe_read_fd and que that for the pipewire server to process.
@@ -54,7 +57,6 @@ void on_process(void *data){
     if (required_bytes>received_bytes){
       memset(data_buff+received_bytes, 0, required_bytes-received_bytes);
     }
-    fprintf(stderr, "Received %d bytes of data from the pipe\n", (int) received_bytes);
   }else if (errno!=EAGAIN){
     fprintf(stderr, "Some unforseen error happened.Error: %s\n", strerror(errno));
     buff->buffer->datas[0].chunk->offset=0;
@@ -62,33 +64,44 @@ void on_process(void *data){
     buff->buffer->datas[0].chunk->size=0;
     memset(data_buff, 0, required_bytes);
   }
-
   pw_stream_queue_buffer(userdata->stream, buff); 
 }
 
 const struct pw_stream_events stream_events={
     PW_VERSION_STREAM_EVENTS,
-    .process=on_process,
+    .process=on_stream_process,
 };
 
-void init_pipewire(void *args){
-  int8_t pipe_read_fd=*(int8_t *) args;
-  fprintf(stderr, "unix pipe file descriptor: %d\n", pipe_read_fd);
+void on_registry_global_event (void *data, uint32_t id, uint32_t permissions, const char *type, uint32_t version, const struct spa_dict *props){
+  fprintf(stderr, "object id:%d type:%s / %d\n", id, type, version);
+}
+
+const struct pw_registry_events registry_events={
+  PW_VERSION_REGISTRY_EVENTS,
+  .global=on_registry_global_event,
+};
+
+void *init_pipewire(void *args){
+  PwInput *input=(PwInput *) args;
+  fprintf(stderr, "unix pipe file descriptor: %d\n", input->pipe_read_fd);
   pw_init(NULL, NULL);
   
   if ((payload.loop=pw_main_loop_new(NULL))==NULL){
     fprintf(stderr, "Failed to acquire a pw main loop\n");
-    return;
+    input->result=-1;
+    return input;
   }
-  payload.pipe_read_head=pipe_read_fd;
+  payload.pipe_read_head=input->pipe_read_fd;
   payload.context=pw_context_new(pw_main_loop_get_loop(payload.loop),NULL, 0);
   if (payload.context==NULL){
     fprintf(stderr, "Unable to acquire a pw context\n");
-    return;
+    input->result=-1;
+    return input;
   }
   if ((payload.core=pw_context_connect(payload.context, NULL, 0))==NULL){
     fprintf(stderr, "Unable to connet to pw core deamon\n");
-    return;
+    input->result=-1;
+    return input;
   }
 
   payload.stream=pw_stream_new(
@@ -103,7 +116,8 @@ void init_pipewire(void *args){
   );
   if (payload.stream==NULL){
     fprintf(stderr, "Unable to create a new pw_stream\n");
-    return;
+    input->result=-1;
+    return input;
   }
   pw_stream_add_listener(payload.stream, &payload.event_listener, &stream_events, &payload);
   
@@ -115,22 +129,36 @@ void init_pipewire(void *args){
                                         .channels=2,
                                         .rate=44100)
                                       );
-  pw_stream_connect(payload.stream, 
-                    PW_DIRECTION_OUTPUT,
-                    PW_ID_ANY,
-                    PW_STREAM_FLAG_AUTOCONNECT|
-                    PW_STREAM_FLAG_MAP_BUFFERS|
-                    PW_STREAM_FLAG_RT_PROCESS,
-                    &payload.param, 1);
+  //pw_stream_connect(payload.stream, 
+                    //PW_DIRECTION_OUTPUT,
+                    //PW_ID_ANY,
+                    //PW_STREAM_FLAG_AUTOCONNECT|
+                    //PW_STREAM_FLAG_MAP_BUFFERS|
+                    //PW_STREAM_FLAG_RT_PROCESS,
+                    //&payload.param, 1);
   
+  if ((payload.registry=pw_core_get_registry(payload.core, PW_VERSION_REGISTRY, 0))==NULL){
+    fprintf(stderr, "Failed to get pipewire core registry.\n");
+    input->result=-1;
+    return input;
+  }
+  if (pw_registry_add_listener(payload.registry, &payload.registry_listener, &registry_events, NULL)!=0){
+    fprintf(stderr, "Error registering handler for global event on the registry object.\n");
+    input->result=-1;
+    return input;
+  }
+
   pw_main_loop_run(payload.loop);
+  return input;
 }
 
-void deinit_pipewire(){
+void *deinit_pipewire(PwInput *input){
   /*
   * Deinitializes all the pipewire allocated objects int payload variable and disconnects the programme
   * from the pipewire deamon. 
   */
   pw_main_loop_quit(payload.loop);
   pw_main_loop_destroy(payload.loop);
+  input->result=0;
+  return input;
 }
