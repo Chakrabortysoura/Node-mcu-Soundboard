@@ -21,11 +21,12 @@
 
 static int8_t total_track_number;
 static int pipeline[2];
+static PwInput pwinput;
 
 void termination_handler(int signal){
   fprintf(stderr, "Closing the programme\n");
   deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
-  deinit_pipewire();
+  deinit_pipewire(&pwinput);
   exit(0);
 }
 
@@ -106,7 +107,8 @@ int main(int argc, char  *argv[]){
     fprintf(stderr, "Error while creating pipe for sending the pipewire server data");
     return 1;
   }
-  
+  pwinput.pipe_read_fd=pipeline[0]; 
+
   /*
    * Initialize the pipewire config and connnect the stream with the help of the context object 
    * on a seperate thread so as to not block the main function execution.
@@ -116,7 +118,8 @@ int main(int argc, char  *argv[]){
     //fprintf(stderr, "Launching pipewire failed.\n");
     //return 1;
   //}
-  init_pipewire(&(pipeline[0])); 
+  pwinput.result=0;
+  init_pipewire(&pwinput); 
   /*
   * Initialize the ffmpeg audio processing header.
   */
@@ -148,7 +151,7 @@ int main(int argc, char  *argv[]){
   //}
 
   fprintf(stderr, "\nClosing the programme\n");
-  deinit_pipewire();
+  deinit_pipewire(&pwinput);
   deinit_av_objects(total_track_number);
   return 0;
 }
