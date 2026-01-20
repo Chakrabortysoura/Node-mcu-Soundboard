@@ -73,7 +73,10 @@ const struct pw_stream_events stream_events={
 };
 
 void on_registry_global_event (void *data, uint32_t id, uint32_t permissions, const char *type, uint32_t version, const struct spa_dict *props){
-  fprintf(stderr, "object id:%d type:%s / %d\n", id, type, version);
+  fprintf(stderr, "object id:%d type:%s / %d=>\n", id, type, version);
+  for (uint32_t i=0;i<props->n_items;i++){
+    fprintf(stderr, "\tKey: %s, Value: %s\n", props->items[i].key, props->items[i].value);
+  }
 }
 
 const struct pw_registry_events registry_events={
