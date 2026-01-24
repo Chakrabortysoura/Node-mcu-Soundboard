@@ -8,6 +8,7 @@
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
 #include <spa/utils/defs.h>
+#include <string.h>
 
 #include "pw_config.h"
 
@@ -72,10 +73,32 @@ const struct pw_stream_events stream_events={
     .process=on_stream_process,
 };
 
+bool match_target_name(const struct spa_dict *props, const char *name){
+  for (int i=0;i<props->n_items;i++){
+    if (strcmp(props->items[i].value, name)==0){
+      return true;
+    }
+  }
+  return false;
+}
+
+uint32_t get_object_id(const struct spa_dict *props){
+  for (int i=0;i<props->n_items;i++){
+    if (strcmp(props->items->key , "object.serial")==0){
+      return (uint32_t) atoi(props->items[i].value);
+    }
+  }
+  return -1;
+}
+
 void on_registry_global_event (void *data, uint32_t id, uint32_t permissions, const char *type, uint32_t version, const struct spa_dict *props){
-  fprintf(stderr, "object id:%d type:%s / %d=>\n", id, type, version);
-  for (uint32_t i=0;i<props->n_items;i++){
-    fprintf(stderr, "\tKey: %s, Value: %s\n", props->items[i].key, props->items[i].value);
+  uint32_t target_node_id=-1;
+  if (strcmp(type, "PipeWire:Interface:Node")==0 && match_target_name(props, "WEBRTC VoiceEngine")){ 
+    target_node_id=(uint32_t) get_object_id(props);
+    fprintf(stderr, "object id:%d type:%s / %d | object serial id:%d =>\n", id, type, version, target_node_id);
+    for (uint32_t i=0;i<props->n_items;i++){
+      fprintf(stderr, "\tKey: %s, Value: %s\n", props->items[i].key, props->items[i].value);
+    }
   }
 }
 
@@ -108,7 +131,7 @@ void *init_pipewire(void *args){
   }
 
   payload.stream=pw_stream_new(
-    payload.core, "soundboard audio stream", 
+    payload.core, "Soundboard", 
     pw_properties_new(
       PW_KEY_MEDIA_TYPE, "Audio",
       PW_KEY_MEDIA_CATEGORY, "Playback",
@@ -122,6 +145,7 @@ void *init_pipewire(void *args){
     input->result=-1;
     return input;
   }
+
   pw_stream_add_listener(payload.stream, &payload.event_listener, &stream_events, &payload);
   
   uint8_t buffer[10024];
@@ -132,13 +156,13 @@ void *init_pipewire(void *args){
                                         .channels=2,
                                         .rate=44100)
                                       );
-  //pw_stream_connect(payload.stream, 
-                    //PW_DIRECTION_OUTPUT,
-                    //PW_ID_ANY,
-                    //PW_STREAM_FLAG_AUTOCONNECT|
-                    //PW_STREAM_FLAG_MAP_BUFFERS|
-                    //PW_STREAM_FLAG_RT_PROCESS,
-                    //&payload.param, 1);
+  pw_stream_connect(payload.stream, 
+                    PW_DIRECTION_OUTPUT,
+                    PW_ID_ANY,
+                    PW_STREAM_FLAG_AUTOCONNECT|
+                    PW_STREAM_FLAG_MAP_BUFFERS|
+                    PW_STREAM_FLAG_RT_PROCESS,
+                    &payload.param, 1);
   
   if ((payload.registry=pw_core_get_registry(payload.core, PW_VERSION_REGISTRY, 0))==NULL){
     fprintf(stderr, "Failed to get pipewire core registry.\n");
