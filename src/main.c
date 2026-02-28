@@ -50,8 +50,11 @@ int main(int argc, char  *argv[]){
   char *serial_port=NULL;
   for(int i=1;i<argc;i++){ // Command line args parser to initilize the necessary configuration variables
     if (strcmp(argv[i], "--err")==0 && i+1<argc){
-      fclose(stderr);
-      stderr=fopen(argv[i+1], "a");
+      FILE *result=fopen(argv[i+1], "a");
+      if (result!=NULL){
+        fclose(stderr);
+        stderr=result;
+      }
     }else if (strcmp(argv[i], "--serial")==0){
       if (i+1<argc){
         serial_port=argv[i+1]; 
