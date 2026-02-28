@@ -202,12 +202,17 @@ void * play(void *args){
     inputs->result=-1;
     return inputs;
   }
+
+  pthread_mutex_lock(&inputs->config->config_file_lock); //Retrieve the target file name from the currently available config data
   if (inputs->config->filename_arr[track_number-1]==NULL){
+    pthread_mutex_lock(&inputs->config->config_file_lock);
     fprintf(stderr, "Audio filepath is not mapped in the config for input: %d\n", track_number);
     inputs->result=-1;
     return inputs;
   }
   char *target_track_path=inputs->config->filename_arr[track_number-1]->str;
+  pthread_mutex_lock(&inputs->config->config_file_lock);
+
   //pthread_mutex_unlock(&inputs->track_input_mutex);
   
   //pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running by the shared variable

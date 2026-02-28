@@ -80,7 +80,7 @@ int main(int argc, char  *argv[]){
   if (config_map==NULL){
     return 1;
   }
-  FILE *config_file=fopen("config.txt", "r");
+  FILE *config_file=fopen(SERIAL_INPUT_MAPPING_FILE, "r");
   if (config_file==NULL){
     fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
     return 1;
