@@ -14,6 +14,7 @@
 
 #include "audio.h"
 #include "config_reader.h"
+#include "config_reload.h"
 #include "pw_config.h"
 #include "serial_com.h"
 
@@ -46,6 +47,7 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   
+  bool live_reload;
   total_track_number=6;
   char *serial_port=NULL;
   for(int i=1;i<argc;i++){ // Command line args parser to initilize the necessary configuration variables
@@ -69,6 +71,8 @@ int main(int argc, char  *argv[]){
         fprintf(stderr, "Default total track mapping to 6 as no input was provided.\n");
         return 1;
       }
+    }else if(strcmp(argv[i], "--reload")==0){
+      live_reload=true;
     }
   }
   
@@ -100,6 +104,11 @@ int main(int argc, char  *argv[]){
   }
   fclose(config_file);
   free(buffer);
+  if (live_reload){ // Initiate the background thread to monitor if the config file was modified
+    if (start_monitoring(config_map)!=0){
+      fprintf(stderr, "Error starting the background thread for live reloading the audio mappings config data.\n");
+    }
+  }
 
   /*
   * Initialize the Unix pipes for inter thread communication between the main thread decoding and resampling audio streams
