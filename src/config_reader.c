@@ -53,7 +53,8 @@ int8_t add_new_mapping(AudioMappings *configs, const char *line){
         return -1;
     }
     if (configs->audio_mapping_arr[input_number-1]!=NULL){
-        fprintf(stderr, "Already a audio file mapping exist for this serial input.\n");
+        fprintf(stderr, "Changed detected for the audio file map for the serial input: %d\n", input_number);
+        configs->is_audio_map_changed[input_number-1]=true;
         return -1;
     }
     if (extract_right_side(line, &configs->audio_mapping_arr[input_number-1], ':')!=0){
