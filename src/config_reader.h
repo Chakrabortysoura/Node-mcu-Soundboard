@@ -16,7 +16,8 @@ typedef struct{
 	String *filename;
 	uint8_t total_number_of_inputs;	
 	String **audio_mapping_arr;
-	
+	//
+	bool *is_audio_map_chaged;
 	// mutex lock for synchronizing live reaload of new config data
 	pthread_mutex_t config_file_lock;
 	// to keep track of when the configs were last read from the file and updated in programme's memory
