@@ -77,6 +77,13 @@ AudioMappings * init_audio_mapping(const char *config, const uint8_t number_of_i
         free(newobj);
         return NULL;
     }
+    newobj->is_audio_map_changed=(bool *)calloc(number_of_inputs, sizeof(bool));
+    if (newobj->is_audio_map_changed==NULL){
+        fprintf(stderr, "Unable to allocate the is_audio_map_changed flag buffer. Error: %s\n", strerror(errno));
+        free(newobj->audio_mapping_arr);
+        free(newobj);
+        return NULL;
+    }
     newobj->last_read=time(NULL);
     return newobj;
 }
