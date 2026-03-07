@@ -197,21 +197,20 @@ void * play(void *args){
   
   //pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
-  if (track_number<=0 && track_number>inputs->config->total_number_of_inputs){
+  if (track_number<=0 || track_number>inputs->config->total_number_of_inputs){
     fprintf(stderr, "The given input is outside the predefine inputs.\n");
     inputs->result=-1;
     return inputs;
   }
 
-  pthread_mutex_lock(&inputs->config->config_file_lock); //Retrieve the target file name from the currently available config data
-  if (inputs->config->filename_arr[track_number-1]==NULL){
-    pthread_mutex_lock(&inputs->config->config_file_lock);
+  if (inputs->config->audio_mapping_arr[track_number-1]==NULL){
     fprintf(stderr, "Audio filepath is not mapped in the config for input: %d\n", track_number);
     inputs->result=-1;
     return inputs;
-  }
-  char *target_track_path=inputs->config->filename_arr[track_number-1]->str;
-  pthread_mutex_lock(&inputs->config->config_file_lock);
+  } 
+  char *target_track_path=inputs->config->audio_mapping_arr[track_number-1]->str;
+  bool is_changed=inputs->config->is_audio_map_changed[track_number-1];
+  inputs->config->is_audio_map_changed[track_number-1]=false;
 
   //pthread_mutex_unlock(&inputs->track_input_mutex);
   
@@ -222,7 +221,7 @@ void * play(void *args){
   fprintf(stderr, "Input track number received: %d\n", track_number);
    
   pthread_testcancel();  
-  if (trackcontext_buffer[track_number-1]==NULL){ 
+  if (trackcontext_buffer[track_number-1]==NULL ||  is_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
     if (read_audio_file_header(track_number, target_track_path)!=0){
       fprintf(stderr, "Aborting the play function. Error in reading audio file header data\n");
       inputs->result=-1;
@@ -235,7 +234,7 @@ void * play(void *args){
   fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
 
   pthread_testcancel();  
-  if (track_stream_ctx_buffer[track_number-1].streamctx==NULL){
+  if (track_stream_ctx_buffer[track_number-1].streamctx==NULL || is_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
      if (get_avcodec_decoder(track_number)!=0){
       fprintf(stderr, "Aborting the play function. Error in getting the decoders for the audio file streams.\n");
       inputs->result=-1;

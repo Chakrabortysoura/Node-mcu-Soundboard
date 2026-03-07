@@ -15,25 +15,25 @@ typedef struct{
 	// Struct to hold the provided names for each input coming from the serial input device
 	String *filename;
 	uint8_t total_number_of_inputs;	
+	// Array containing the filename in the target edirectory for the serial audio inputs
 	String **audio_mapping_arr;
-	//
-	bool *is_audio_map_chaged;
-	// mutex lock for synchronizing live reaload of new config data
-	pthread_mutex_t config_file_lock;
+	// Boolean array to indicate whether audio file mapping for a particular serial input was modified
+	bool *is_audio_map_changed;
 	// to keep track of when the configs were last read from the file and updated in programme's memory
 	time_t last_read;
 
 }AudioMappings; 
+
 /*
  * Return a new audiomappings struct with the config data parsed from the `config` file with the number
  * of inputs provided. 
  */
-AudioMappings * init_audio_mapping(const char *config, const uint8_t number_of_inputs);
+AudioMappings * init_audio_mapping(const char *config_filename, const uint8_t number_of_inputs);
 
 /*
  * Add a new serial input to audio file mapping in the existing audio mapping struct
  */
-int8_t add_new_mapping(AudioMappings *configs, const char *line);
+int8_t add_new_mapping(AudioMappings *configs, char *line);
 
 /*
 * Functions to check if the config file was modified since the last time it was read. 

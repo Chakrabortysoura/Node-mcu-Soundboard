@@ -14,7 +14,6 @@
 
 #include "audio.h"
 #include "config_reader.h"
-#include "config_reload.h"
 #include "pw_config.h"
 #include "serial_com.h"
 
@@ -47,7 +46,6 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   
-  bool live_reload;
   total_track_number=6;
   char *serial_port=NULL;
   for(int i=1;i<argc;i++){ // Command line args parser to initilize the necessary configuration variables
@@ -71,8 +69,6 @@ int main(int argc, char  *argv[]){
         fprintf(stderr, "Default total track mapping to 6 as no input was provided.\n");
         return 1;
       }
-    }else if(strcmp(argv[i], "--reload")==0){
-      live_reload=true;
     }
   }
   
@@ -80,7 +76,7 @@ int main(int argc, char  *argv[]){
     * Read and parse the configdata provided int the default config file path. 
     * Right now custom config file paths are not acceptable from the command line arguments.
     */
-  AudioMappings *config_map=init_audio_mapping(total_track_number);
+  AudioMappings *config_map=init_audio_mapping(SERIAL_INPUT_MAPPING_FILE, total_track_number);
   if (config_map==NULL){
     return 1;
   }
@@ -100,19 +96,14 @@ int main(int argc, char  *argv[]){
     if (newline_idx!=NULL){
       *newline_idx='\0';
     }
-    add_new_mapping(config_map, buffer);
+    add_new_mapping(config_map, buffer); // Ignoring any error occuring in add_new_mapping as any error related to non-existent audio mapping is handled in the audio module's play function. 
   }
   fclose(config_file);
   free(buffer);
-  if (live_reload){ // Initiate the background thread to monitor if the config file was modified
-    if (start_monitoring(config_map)!=0){
-      fprintf(stderr, "Error starting the background thread for live reloading the audio mappings config data.\n");
-    }
-  }
 
   /*
-  * Initialize the Unix pipes for inter thread communication between the main thread decoding and resampling audio streams
-  * and the pipewire stream that is consuming the data coming for playback.
+    * Initialize the Unix pipes for inter thread communication between the main thread decoding and resampling audio streams
+    * and the pipewire stream that is consuming the data coming for playback.
   */
   if (pipe2(pipeline, O_NONBLOCK)!=0){ // Initiate the pipe file descriptor
     fprintf(stderr, "Error while creating pipe for sending the pipewire server data");
@@ -122,24 +113,20 @@ int main(int argc, char  *argv[]){
   /*
    * Initialize the pipewire config and connnect the stream with the help of the context object 
    * on a seperate thread so as to not block the main function execution.
-    */
+  */
   pthread_t t1;
   if (pthread_create(&t1, 0, init_pipewire, &pipeline[0])!=0){
     fprintf(stderr, "Launching pipewire failed.\n");
     return 1;
   }
   
-  /*
-  * Initialize the ffmpeg audio processing header.
-  */
+  // Initialize the ffmpeg audio processing header.
   if (init_av_objects(total_track_number)!=0){
     fprintf(stderr, "Error initializing all the av objects\n");
     return 1;
   }
   
-  /*
-  * Configure the serial port for io with the given path to the serial device.
-  */
+  // Configure the serial port for io with the given path to the serial device.
   if (serial_port==NULL){
     fprintf(stderr, "Please provide a address for the serial input device.\n");
     return 1;

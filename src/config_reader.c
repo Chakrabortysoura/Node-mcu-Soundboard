@@ -1,4 +1,4 @@
-/ created by souranil on 2/1/2026.
+// created by souranil on 2/1/2026.
 //
 #include <stdint.h>
 #include <stdio.h>
@@ -10,7 +10,7 @@
 #include "config_reader.h"
 #include "String.h"
 
-int64_t index(const char *str, const char search_term){
+int64_t index(char *str, const char search_term){
     /*This function searches for a particular search_term char in the given string
     * returns -1 on failure to find the search_term or index of the char in the string.
     * In order for this function to work properly the given string has to null-terminated.
@@ -24,7 +24,7 @@ int64_t index(const char *str, const char search_term){
     return (int64_t) total_len-split_len;
 }
 
-uint8_t extract_right_side(const char *src, String **target_buffer, const char splitter){
+uint8_t extract_right_side(char *src, String **target_buffer, const char splitter){
     /*
      * Split the given src string at the splitter character and copy the right side of the split string in the target_buffer.
      * Return: -ve return value for any internal error and 0 when successful.
@@ -42,7 +42,7 @@ uint8_t extract_right_side(const char *src, String **target_buffer, const char s
     return 0;
 }
 
-int8_t add_new_mapping(AudioMappings *configs, const char *line){
+int8_t add_new_mapping(AudioMappings *configs, char *line){
     if (configs==NULL){
         fprintf(stderr, "Uninitialized configs data structure.\n");
         return -1;
@@ -55,7 +55,6 @@ int8_t add_new_mapping(AudioMappings *configs, const char *line){
     if (configs->audio_mapping_arr[input_number-1]!=NULL){
         fprintf(stderr, "Changed detected for the audio file map for the serial input: %d\n", input_number);
         configs->is_audio_map_changed[input_number-1]=true;
-        return -1;
     }
     if (extract_right_side(line, &configs->audio_mapping_arr[input_number-1], ':')!=0){
         return -2;
@@ -63,14 +62,14 @@ int8_t add_new_mapping(AudioMappings *configs, const char *line){
     return 0;
 }
 
-AudioMappings * init_audio_mapping(const char *config, const uint8_t number_of_inputs){
+AudioMappings * init_audio_mapping(const char *config_filename, const uint8_t number_of_inputs){
     //Initialize the audiomappings struct with the given number of total possible mappings
     AudioMappings *newobj=(AudioMappings *) calloc(1, sizeof(AudioMappings));
     if (newobj==NULL){
         fprintf(stderr, "AudioMapping allocation failed. Error: %s\n", strerror(errno));
         return NULL; 
     }
-    newobj->filename=init_string_from_src(config);
+    newobj->filename=init_string_from_src(config_filename);
     newobj->total_number_of_inputs=number_of_inputs;
     newobj->audio_mapping_arr=(String **)calloc(number_of_inputs, sizeof(String *));
     if (newobj->audio_mapping_arr==NULL){
