@@ -22,6 +22,18 @@
 static int8_t total_track_number;
 static int pipeline[2];
 
+static inline void print_help_message(){
+  fprintf(stdout, "This is the help message.\n");
+}
+
+static inline bool help_flag_present(const int argc, char *argv[]){
+  for(int i=0;i<argc;i++){
+    if(strcmp(argv[i], "--help")==0 || strcmp(argv[i], "--h")){
+      return true;
+    }
+  }
+  return false;
+}
 void termination_handler(int signal){
   fprintf(stderr, "Closing the programme\n");
   deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
@@ -30,6 +42,14 @@ void termination_handler(int signal){
 }
 
 int main(int argc, char  *argv[]){
+  if (argc<2){
+    fprintf(stdout, "No path to the serial device provided.\n");
+    print_help_message();
+    return 1;
+  }else if (help_flag_present(argc, argv)){
+    print_help_message();
+    return 0;
+  }
   // Registering some basic signal handlers for the programme. 
   signal(SIGINT, termination_handler);  
   signal(SIGTERM, termination_handler);
