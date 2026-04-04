@@ -21,6 +21,7 @@
 
 static int8_t total_track_number;
 static int pipeline[2];
+AudioMappings *config_map;
 
 static inline void print_help_message(){
   fprintf(stdout, "This is the help message.\n");
@@ -34,11 +35,18 @@ static inline bool help_flag_present(const int argc, char *argv[]){
   }
   return false;
 }
-void termination_handler(int signal){
-  fprintf(stderr, "Closing the programme\n");
+
+void cleanup_handler(){
   deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
   deinit_pipewire();
-  exit(0);
+  deinit_audio_mapping(config_map);
+  close(pipeline[0]);
+  close(pipeline[1]);
+}
+
+void termination_handler(int signal){
+  fprintf(stderr, "Closing the programme\n");
+  exit(signal);
 }
 
 int main(int argc, char  *argv[]){
@@ -96,7 +104,7 @@ int main(int argc, char  *argv[]){
     * Read and parse the configdata provided int the default config file path. 
     * Right now custom config file paths are not acceptable from the command line arguments.
     */
-  AudioMappings *config_map=init_audio_mapping(SERIAL_INPUT_MAPPING_FILE, total_track_number);
+  config_map=init_audio_mapping(SERIAL_INPUT_MAPPING_FILE, total_track_number);
   if (config_map==NULL){
     return 1;
   }
@@ -167,7 +175,6 @@ int main(int argc, char  *argv[]){
   }
 
   fprintf(stderr, "\nClosing the programme\n");
-  deinit_pipewire();
-  deinit_av_objects(total_track_number);
+  cleanup_handler();
   return 0;
 }

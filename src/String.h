@@ -15,8 +15,21 @@ typedef struct{
   char *str;
 }String;
 
+/*
+  * Allocate an empty string object. 
+  * The internal char array remains uinitialized.
+  */
 String * init_string();
 
+/*
+  * Allocate a new string object from an existring char array. 
+  * This src char array must be Null terminated.
+  */
 String * init_string_from_src(const char *src);
+
+/*
+  * Deinitialize a string object.
+  */
+void deinit_string(String *str);
 
 #endif

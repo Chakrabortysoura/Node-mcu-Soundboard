@@ -31,6 +31,11 @@ typedef struct{
 AudioMappings * init_audio_mapping(const char *config_filename, const uint8_t number_of_inputs);
 
 /*
+ * De-initialize the audiomapping struct and all it's internal data.
+ */
+void deinit_audio_mapping(AudioMappings *config_map);
+
+/*
  * Add a new serial input to audio file mapping in the existing audio mapping struct
  */
 int8_t add_new_mapping(AudioMappings *configs, char *line);
@@ -40,5 +45,6 @@ int8_t add_new_mapping(AudioMappings *configs, char *line);
 * Return value: -1 failure, 0 not modified, 1 modified.
 */
 int8_t is_modified(const AudioMappings *configs);
+
 
 #endif

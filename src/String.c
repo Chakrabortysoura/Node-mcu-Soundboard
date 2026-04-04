@@ -27,3 +27,8 @@ String * init_string_from_src(const char *src){
   result->len=result->size-10;
   return result; 
 }
+
+void deinit_string(String *str){
+  free(str->str);
+  free(str);
+}

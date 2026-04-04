@@ -88,6 +88,15 @@ AudioMappings * init_audio_mapping(const char *config_filename, const uint8_t nu
     return newobj;
 }
 
+void deinit_audio_mapping(AudioMappings *config_map){
+    for(uint8_t i=0;i<config_map->total_number_of_inputs;i++){
+       deinit_string(config_map->audio_mapping_arr[i]); 
+    }
+    deinit_string(config_map->filename);
+    free(config_map->audio_mapping_arr);
+    free(config_map);
+}
+
 int8_t is_modified(const AudioMappings *configs){
     if (configs==NULL){
         fprintf(stderr, "Uninitialized configs data structure.\n");
