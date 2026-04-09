@@ -97,6 +97,17 @@ void deinit_audio_mapping(AudioMappings *config_map){
     free(config_map);
 }
 
+uint8_t generate_config(){
+	const char *default_config="1 : example.mp3\n2 :\n3 :\n4 :\n5 :\n6 :\n";\
+	
+	FILE *baseconfigfile=fopen("config.txt", "w");
+	if (fputs(default_config, baseconfigfile)<0){
+		fprintf(stderr, "Issue generating the default template for the config file: %s\n", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
 int8_t is_modified(const AudioMappings *configs){
     if (configs==NULL){
         fprintf(stderr, "Uninitialized configs data structure.\n");

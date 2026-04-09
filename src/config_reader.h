@@ -11,6 +11,14 @@
 
 #include "String.h"
 
+/*
+ * This function generates a default config file with the appropiate structure in the 
+ * target config directory of the user.
+ * Return: 0 for successfully generating the default config file template.
+ *	  -1 for failure.
+ */
+uint8_t generate_config();
+
 typedef struct{
 	// Struct to hold the provided names for each input coming from the serial input device
 	String *filename;

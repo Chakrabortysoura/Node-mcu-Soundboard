@@ -110,7 +110,15 @@ int main(int argc, char  *argv[]){
   }
   FILE *config_file=fopen(SERIAL_INPUT_MAPPING_FILE, "r");
   if (config_file==NULL){
-    fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
+    if (errno==ENONET){
+      if (generate_config()==0){ //Attempts to generate and save the default audio file mapping config file template to the directory
+        fprintf(stderr, "Default config file template generated.\n");
+      }else{
+        fprintf(stderr, "Default config file template generation failed.\n");
+      }
+    }else{
+      fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
+    }
     return 1;
   }
   size_t len=1024;
