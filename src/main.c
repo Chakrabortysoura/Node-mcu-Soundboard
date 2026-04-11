@@ -24,7 +24,14 @@ static int pipeline[2];
 AudioMappings *config_map;
 
 static inline void print_help_message(){
-  fprintf(stdout, "This is the help message.\n");
+  fprintf(stdout, "Command format: soundboard --[flag] [argument]\n"
+                  "Available flags and their uses:\n"
+                  "--help   : Print the helper message\n"
+                  "--serial : Path to the serial input device\n"
+                  "--err    : Change the standard error of this programme to point to any specific file\n"
+                  "--track  : Total number of inputs to map to target tracks"
+          );
+  
 }
 
 static inline bool help_flag_present(const int argc, char *argv[]){
@@ -77,9 +84,16 @@ int main(int argc, char  *argv[]){
   total_track_number=6;
   char *serial_port=NULL;
   for(int i=1;i<argc;i++){ // Command line args parser to initilize the necessary configuration variables
-    if (strcmp(argv[i], "--err")==0 && i+1<argc){
+    if (strcmp(argv[i], "--err")==0){
+      if (i+1>=argc){
+        fprintf(stderr, "Please provide an address to a file to remap the stderr.\n");
+        fprintf(stdout, "Stdout couldn't be remaped.\n");
+        continue;
+      }
       FILE *result=fopen(argv[i+1], "a");
-      if (result!=NULL){
+      if (result==NULL){
+        fprintf(stdout, "Stdout couldn't be remaped to the target file: %s. Error: %s", argv[i+1], strerror(errno));
+      }else{
         fclose(stderr);
         stderr=result;
       }
@@ -95,7 +109,6 @@ int main(int argc, char  *argv[]){
         total_track_number=atoi(argv[i+1]);
       }else{
         fprintf(stderr, "Default total track mapping to 6 as no input was provided.\n");
-        return 1;
       }
     }
   }
@@ -121,7 +134,7 @@ int main(int argc, char  *argv[]){
     }
     return 1;
   }
-  size_t len=1024;
+  size_t len=1024; // Read each line from the text file and parse those line to store the audio mappings for each of the inputs from the serial device.
   char *buffer=calloc(len, sizeof(char));
   if (buffer==NULL){
     fprintf(stderr, "Error allocating string buffer for reading context file. Error: %s\n", strerror(errno));

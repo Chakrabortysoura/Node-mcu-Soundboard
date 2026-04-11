@@ -98,7 +98,13 @@ void deinit_audio_mapping(AudioMappings *config_map){
 }
 
 uint8_t generate_config(){
-	const char *default_config="1 : example.mp3\n2 :\n3 :\n4 :\n5 :\n6 :\n";\
+	const char *default_config="1 : [example.mp3]\n"
+                                   "2 :\n"
+                                   "3 :\n"
+                                   "4 :\n"
+                                   "5 :\n"
+                                   "6 :\n"
+                                   "Provide a path to a valid audio file for each of the input. Remove this line";
 	
 	FILE *baseconfigfile=fopen("config.txt", "w");
 	if (fputs(default_config, baseconfigfile)<0){
