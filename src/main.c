@@ -17,26 +17,25 @@
 #include "pw_config.h"
 #include "serial_com.h"
 
-#define SERIAL_INPUT_MAPPING_FILE "config.txt"
-
 static int8_t total_track_number;
 static int pipeline[2];
 AudioMappings *config_map;
 
 static inline void print_help_message(){
-  fprintf(stdout, "Command format: soundboard --[flag] [argument]\n"
+  fprintf(stdout, "Command format: soundboard -[required flag] --[optional flag] [argument]\n"
                   "Available flags and their uses:\n"
-                  "--help   : Print the helper message\n"
-                  "--serial : Path to the serial input device\n"
-                  "--err    : Change the standard error of this programme to point to any specific file\n"
-                  "--track  : Total number of inputs to map to target tracks"
+                  "-serial     : Path to the serial input device\n"
+                  "--config    : Path to the config file\n"
+                  "--help / -h : Print the helper message\n"
+                  "--err       : Change the standard error of this programme to point to any specific file\n"
+                  "--track     : Total number of inputs to map to target tracks\n"
           );
   
 }
 
 static inline bool help_flag_present(const int argc, char *argv[]){
   for(int i=0;i<argc;i++){
-    if(strcmp(argv[i], "--help")==0 || strcmp(argv[i], "--h")){
+    if(strstr(argv[i], "-h")!=nullptr){
       return true;
     }
   }
@@ -52,6 +51,7 @@ void cleanup_handler(){
 }
 
 void termination_handler(int signal){
+  cleanup_handler();
   fprintf(stderr, "Closing the programme\n");
   exit(signal);
 }
@@ -81,12 +81,13 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   
+  // Parse the necessary command line arguments provided to the programme to initialize the neccessary inital values. 
   total_track_number=6;
-  char *serial_port=NULL;
-  for(int i=1;i<argc;i++){ // Command line args parser to initilize the necessary configuration variables
+  const char *serial_port=nullptr, *config_filename=nullptr;
+  for(int i=1;i<argc;i++){ 
     if (strcmp(argv[i], "--err")==0){
       if (i+1>=argc){
-        fprintf(stderr, "Please provide an address to a file to remap the stderr.\n");
+        fprintf(stderr, "No filename provided to remap he stderr to.\n");
         fprintf(stdout, "Stdout couldn't be remaped.\n");
         continue;
       }
@@ -97,7 +98,7 @@ int main(int argc, char  *argv[]){
         fclose(stderr);
         stderr=result;
       }
-    }else if (strcmp(argv[i], "--serial")==0){
+    }else if (strcmp(argv[i], "-serial")==0){
       if (i+1<argc){
         serial_port=argv[i+1]; 
       }else{
@@ -110,21 +111,35 @@ int main(int argc, char  *argv[]){
       }else{
         fprintf(stderr, "Default total track mapping to 6 as no input was provided.\n");
       }
+    }else if (strcmp(argv[i], "--config")==0){
+      if (i+1<argc){
+        config_filename=argv[i+1];
+      }else{
+        fprintf(stderr, "Default config file: config.txt\n");
+      }
     }
+  }
+  if (serial_port==nullptr){
+    fprintf(stderr, "Please provide the address to the serial port with the \"-serial\" flag. \n");
+    print_help_message();
+    return 1;
+  }
+  if (config_filename==nullptr){
+    config_filename="config.txt";
   }
   
   /*
     * Read and parse the configdata provided int the default config file path. 
     * Right now custom config file paths are not acceptable from the command line arguments.
     */
-  config_map=init_audio_mapping(SERIAL_INPUT_MAPPING_FILE, total_track_number);
+  config_map=init_audio_mapping(config_filename, total_track_number);
   if (config_map==NULL){
     return 1;
   }
-  FILE *config_file=fopen(SERIAL_INPUT_MAPPING_FILE, "r");
+  FILE *config_file=fopen(config_filename, "rw");
   if (config_file==NULL){
     if (errno==ENONET){
-      if (generate_config()==0){ //Attempts to generate and save the default audio file mapping config file template to the directory
+      if (generate_config()==0){ //Attempts to generate a template for the audio file mapping and save it to the provided config file path incase the config file doesn't exist.
         fprintf(stderr, "Default config file template generated.\n");
       }else{
         fprintf(stderr, "Default config file template generation failed.\n");
@@ -141,10 +156,10 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   while (getline(&buffer, &len, config_file)>0){
-    char *newline_idx=strchr(buffer, '\n');
-    if (newline_idx!=NULL){
-      *newline_idx='\0';
-    }
+    //char *newline_idx=strchr(buffer, '\n');
+    //if (newline_idx!=NULL){
+      //*newline_idx='\0';
+    //}
     add_new_mapping(config_map, buffer); // Ignoring any error occuring in add_new_mapping as any error related to non-existent audio mapping is handled in the audio module's play function. 
   }
   fclose(config_file);
@@ -159,30 +174,29 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   
+  // Configure the serial port for io with the given path to the serial device.
+  int serial_port_fd=init_serial_port(serial_port);
+  if (serial_port_fd<=0){
+    fprintf(stderr, "Error configuring serial port device.\n");
+    return 1;
+  }
+
   /*
    * Initialize the pipewire config and connnect the stream with the help of the context object 
    * on a seperate thread so as to not block the main function execution.
   */
   pthread_t t1;
-  if (pthread_create(&t1, 0, init_pipewire, &pipeline[0])!=0){
+  if (pthread_create(&t1, nullptr, init_pipewire, &pipeline[0])!=0){
     fprintf(stderr, "Launching pipewire failed.\n");
+    goto cleanup_exit;
     return 1;
   }
   
   // Initialize the ffmpeg audio processing header.
   if (init_av_objects(total_track_number)!=0){
     fprintf(stderr, "Error initializing all the av objects\n");
+    goto cleanup_exit;
     return 1;
-  }
-  
-  // Configure the serial port for io with the given path to the serial device.
-  if (serial_port==NULL){
-    fprintf(stderr, "Please provide a address for the serial input device.\n");
-    return 1;
-  }
-  int serial_port_fd=init_serial_port(serial_port);
-  if (serial_port_fd<=0){
-    fprintf(stderr, "Error configuring serial port device.\n");
   }
 
   PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false, .config=config_map}; 
@@ -194,8 +208,8 @@ int main(int argc, char  *argv[]){
       play(&audio_input);
     }
   }
-
-  fprintf(stderr, "\nClosing the programme\n");
-  cleanup_handler();
+  cleanup_exit:
+    cleanup_handler();
+    fprintf(stderr, "\nClosing the programme\n");
   return 0;
 }
