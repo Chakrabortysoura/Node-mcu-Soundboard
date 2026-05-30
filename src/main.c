@@ -80,7 +80,7 @@ int main(int argc, char  *argv[]){
     fprintf(stderr, "Error in changing the base directory: %s\nProvided path: %s\n", strerror(errno), homepath);
     return 1;
   }
-  
+
   // Parse the necessary command line arguments provided to the programme to initialize the neccessary inital values. 
   total_track_number=6;
   const char *serial_port=nullptr, *config_filename=nullptr;
@@ -156,10 +156,10 @@ int main(int argc, char  *argv[]){
     return 1;
   }
   while (getline(&buffer, &len, config_file)>0){
-    //char *newline_idx=strchr(buffer, '\n');
-    //if (newline_idx!=NULL){
-      //*newline_idx='\0';
-    //}
+    char *newline_idx=strchr(buffer, '\n');
+    if (newline_idx!=NULL){
+      *newline_idx='\0';
+    }
     add_new_mapping(config_map, buffer); // Ignoring any error occuring in add_new_mapping as any error related to non-existent audio mapping is handled in the audio module's play function. 
   }
   fclose(config_file);

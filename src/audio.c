@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/error.h>
 #include <libswresample/swresample.h>
 #include <libavutil/opt.h>
 
@@ -72,7 +73,7 @@ int8_t init_av_objects(const int total_track_number){
 }
 
 void deinit_av_objects(const int total_track_number){
-  //Cleanup all the allocated objects before exiting the programme
+  //Cleanup all the allocated objects before exiting the program
   av_frame_free(&dataframein);
   av_frame_free(&dataframeout);
   av_packet_free(&datapacket);
@@ -95,17 +96,20 @@ int read_audio_file_header(const int track_number, const char *track_path){
    * Returns 0 on success and -1 for any error. 
    * Errors are logged with stderr. 
    */
+  int ret=0;
   if ((trackcontext_buffer[track_number-1]=avformat_alloc_context())==NULL){
     fprintf(stderr, "AVFormat context allocation failed for track number: %d\n", track_number);
     return -1;
   } 
   
-  if ((avformat_open_input(&trackcontext_buffer[track_number-1], track_path, NULL, NULL))!=0){
-    fprintf(stderr, "Error when trying to open the audio file: %s\n", track_path);
+  ret=avformat_open_input(&trackcontext_buffer[track_number-1], track_path, NULL, NULL);
+  if (ret<0){
+    fprintf(stderr, "Error when trying to open the audio file: %s. Error: %s\n", track_path, av_err2str(ret));
     return -1;
   }
-  if (avformat_find_stream_info(trackcontext_buffer[track_number-1], NULL)<0){
-    fprintf(stderr, "Error inspecting stream information for the audio trcak: %s\n", track_path);
+  ret=avformat_find_stream_info(trackcontext_buffer[track_number-1], NULL);
+  if (ret<0){
+    fprintf(stderr, "Error inspecting stream information for the audio trcak: %s. Error:%s\n", track_path, av_err2str(ret));
     return -1;
   }
   av_dump_format(trackcontext_buffer[track_number-1], -1, NULL, 0);
@@ -190,8 +194,7 @@ void write_to_pipe(const int pipe_write_fd){
 
 void * play(void *args){
   /*
-    * This function expeects a path to a audio track to play and all the tracks are to labelled as numbers in the 
-    * designated directory. Ex- 1.mp3, 2.mp3 etc or optionally this function can also take track names too. 
+    * This function expeects pointer to a PlayInput value which will contain the neccessary details for input mapping.
   */
   PlayInput *inputs=(PlayInput *)args; 
   
@@ -223,7 +226,7 @@ void * play(void *args){
   pthread_testcancel();  
   if (trackcontext_buffer[track_number-1]==NULL ||  is_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
     if (read_audio_file_header(track_number, target_track_path)!=0){
-      fprintf(stderr, "Aborting the play function. Error in reading audio file header data\n");
+      fprintf(stderr, "Aborting the play function. Error in reading audio file header data.\n\n");
       inputs->result=-1;
       //pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
