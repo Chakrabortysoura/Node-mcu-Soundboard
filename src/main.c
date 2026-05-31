@@ -155,11 +155,9 @@ int main(int argc, char  *argv[]){
     fprintf(stderr, "Error allocating string buffer for reading context file. Error: %s\n", strerror(errno));
     return 1;
   }
-  while (getline(&buffer, &len, config_file)>0){
-    char *newline_idx=strchr(buffer, '\n');
-    if (newline_idx!=NULL){
-      *newline_idx='\0';
-    }
+  ssize_t linesize=0;
+  while ((linesize=getline(&buffer, &len, config_file))>0){
+    buffer[linesize-1]='\0';
     add_new_mapping(config_map, buffer); // Ignoring any error occuring in add_new_mapping as any error related to non-existent audio mapping is handled in the audio module's play function. 
   }
   fclose(config_file);
