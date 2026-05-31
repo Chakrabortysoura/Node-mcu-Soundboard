@@ -92,7 +92,7 @@ void init_pipewire(void *args){
   }
 
   payload.stream=pw_stream_new(
-    payload.core, "soundboard audio stream", 
+    payload.core, "soundboard", 
     pw_properties_new(
       PW_KEY_MEDIA_TYPE, "Audio",
       PW_KEY_MEDIA_CATEGORY, "Playback",

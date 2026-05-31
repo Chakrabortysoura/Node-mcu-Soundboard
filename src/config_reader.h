@@ -19,9 +19,12 @@
  */
 uint8_t generate_config();
 
+/*
+ * Struct to hold the names of each audio file that were mapped to all the inputs numbers from the serial input device.
+ * This struct also contains info about the last time the config file was read in programme. 
+ */
 typedef struct{
-	// Struct to hold the provided names for each input coming from the serial input device
-	String *filename;
+	String *filename; // Filename of the source config file provided for the audio mappings.
 	uint8_t total_number_of_inputs;	
 	// Array containing the filename in the target edirectory for the serial audio inputs
 	String **audio_mapping_arr;
