@@ -23,7 +23,8 @@ Current goals-
 1. Configure a Bash script to setup the udev rules to assign a specific path when connnecting the microcontroller over USB. 
 2. Implementing the logic for auto linking with target applications using the pipewire apis.
 3. A second confiugration parser to specify the target application along with the existing audio file mappings configuration. 
-4. Analysis with Valigrind to detect to potential memoery leaks in some parts of the applicaiton. 5. Implementing the interupt to cancel a playback midway when receiving a new input from the microcontroller.
+4. Analysis with Valigrind to detect to potential memoery leaks in some parts of the applicaiton. 
+5. Implementing the interupt to cancel a playback midway when receiving a new input from the microcontroller.
 
 ## Use of AI
 
