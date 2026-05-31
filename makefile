@@ -2,7 +2,6 @@
 
 # Source files
 SRCS := $(wildcard src/*.c)
-# You can add more source files like: SRCS := main.c utils.c audio_processing.c
 
 # Object files (compiled .o files from source files)
 OBJS := $(patsubst src/%.c, bin/%.o,$(SRCS))
@@ -11,18 +10,12 @@ OBJS := $(patsubst src/%.c, bin/%.o,$(SRCS))
 TARGET := sound_board.out
 
 # --- Compiler and Flags ---
-CC := clang 
-CFLAGS := -Wall -g2 -O0 -pthread -std=c23# -Wall enables all warnings, -g enables debugging info
+CC := gcc 
+CFLAGS := -Wall -g2 -O0 -pthread -std=c23
 
-# Use pkg-config to get PipeWire's CFLAGS and LIBS
 PKG_CONFIG_PIPEWIRE_CFLAGS := $(shell pkg-config --cflags libpipewire-0.3)
 PKG_CONFIG_PIPEWIRE_LIBS := $(shell pkg-config --libs libpipewire-0.3)
 
-# Use pkg-config to get Wireplumber's CFLAGS and LIBS
-#PKG_CONFIG_CFLAGS := $(shell pkg-config --cflags wireplumber-0.5)
-#PKG_CONFIG_LIBS := $(shell pkg-config --libs wireplumber-0.5)
-
-# Use pkg-config to get ffmpeg CFLAGS and LIBS
 PKG_CONFIG_FFMPEG_CFLAGS := $(shell pkg-config --cflags libswresample libavformat libavcodec libavutil)
 PKG_CONFIG_FFMPEG_LIBS := $(shell pkg-config --libs libswresample libavformat libavcodec libavutil)
 
@@ -44,8 +37,7 @@ bin/%.o: src/%.c
 clean:
 	rm -f $(OBJS) $(TARGET) compile_commands.json
 
-# Bear command to generate a compile_command.json file for the project
+# Bear command to generate a compile_command.json file for the project which works with clangd lsp support in my nvim
 bear: 
 	bear -- make all
-
 
