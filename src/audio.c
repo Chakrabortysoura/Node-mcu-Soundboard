@@ -133,8 +133,9 @@ int get_avcodec_decoder(const int track_number){
       fprintf(stderr, "Internal error allocating AVCodecContext object for the %d stream for audio file: %d", i, track_number);
       return -1;
     }
-    if (avcodec_open2(track_stream_ctx_buffer[track_number-1].streamctx[i], avcodec_find_decoder(trackcontext_buffer[track_number-1]->streams[i]->codecpar->codec_id),NULL)!=0){
-      fprintf(stderr, "Error finding the decoder for stream no:%d in track no:%d\n", i, track_number);
+    int ret=avcodec_open2(track_stream_ctx_buffer[track_number-1].streamctx[i], avcodec_find_decoder(trackcontext_buffer[track_number-1]->streams[i]->codecpar->codec_id),NULL);
+    if (ret!=0){
+      fprintf(stderr, "Error finding the decoder for stream no:%d in track no:%d.Error: %s\n", i, track_number, av_err2str(ret));
       return -1;
     }
   }
@@ -144,24 +145,25 @@ int get_avcodec_decoder(const int track_number){
 int configure_resampler(const int track_number){
   /*
    * This function configures the SwrContext object with the properties of the input audio file.
-   * The target format remains the same regardless to maintains compatibility with pipewire pw_buffer configurations 
+   * The target format remains the same regardless to maintain compatibility with pipewire pw_buffer configurations 
    * at the time of initialization. This function assumes that a valid AVFrame has been decoded from the audio stream in datapacketin.
    */ 
   
-  int err=0;
-  err|=av_opt_set_int(resampler, "in_sample_rate", dataframein->sample_rate, 0);
-  err|=av_opt_set_int(resampler, "out_sample_rate", 44100, 0);
-  err|=av_opt_set_chlayout(resampler, "in_chlayout", &dataframein->ch_layout,0);
-  err|=av_opt_set_chlayout(resampler, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0);
-  err|=av_opt_set_sample_fmt(resampler, "in_sample_fmt", dataframein->format, 0);
-  err|=av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
-  if (err!=0){
-    fprintf(stderr, "Failed to configure the resampler parameters\n");
+  int ret=0;
+  ret|=av_opt_set_int(resampler, "in_sample_rate", dataframein->sample_rate, 0);
+  ret|=av_opt_set_int(resampler, "out_sample_rate", 44100, 0);
+  ret|=av_opt_set_chlayout(resampler, "in_chlayout", &dataframein->ch_layout,0);
+  ret|=av_opt_set_chlayout(resampler, "out_chlayout", &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO, 0);
+  ret|=av_opt_set_sample_fmt(resampler, "in_sample_fmt", dataframein->format, 0);
+  ret|=av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
+  if (ret!=0){
+    fprintf(stderr, "Failed to configure the resampler parameters. Error: %s\n", av_err2str(ret));
     return -1;
   }
   //Initialize the resampler for use in play function
-  if (swr_init(resampler)!=0){
-    fprintf(stderr, "Error when initializing the resampler. Track number: %d\n", track_number);
+  ret=swr_init(resampler);
+  if (ret!=0){
+    fprintf(stderr, "Error when initializing the resampler. Track number: %d. Error:%s\n", track_number, av_err2str(ret));
     return -1;
   }
   return 0;
@@ -183,10 +185,9 @@ void write_to_pipe(const int pipe_write_fd){
     if (ret>0){
       data_ptr+=ret;
       remaining-=ret;
-      fprintf(stderr, "Wrote %d bytes to the pipe.\n", (int) ret);
     }else if (errno!=EAGAIN){
-      // The error is not due to the pipe having less capacity
-      fprintf(stderr, "Breaking the loop for some unforseen error in the pipeline.Error: %s\n", strerror(errno));
+      // The retor is not due to the pipe having less capacity
+      fprintf(stderr, "Breaking the loop for retor in the pipeline.retor: %s\n", strerror(errno));
       break;
     }
   }
@@ -226,7 +227,7 @@ void * play(void *args){
   pthread_testcancel();  
   if (trackcontext_buffer[track_number-1]==NULL ||  is_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
     if (read_audio_file_header(track_number, target_track_path)!=0){
-      fprintf(stderr, "Aborting the play function. Error in reading audio file header data.\n\n");
+      fprintf(stderr, "Aborting the play function. retor in reading audio file header data.\n\n");
       inputs->result=-1;
       //pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
@@ -239,7 +240,7 @@ void * play(void *args){
   pthread_testcancel();  
   if (track_stream_ctx_buffer[track_number-1].streamctx==NULL || is_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
      if (get_avcodec_decoder(track_number)!=0){
-      fprintf(stderr, "Aborting the play function. Error in getting the decoders for the audio file streams.\n");
+      fprintf(stderr, "Aborting the play function. retor in getting the decoders for the audio file streams.\n");
       inputs->result=-1;
       //pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
@@ -249,39 +250,39 @@ void * play(void *args){
   }
   pthread_testcancel();  // Another exit point from this function
 
-  int err_ret=0;
+  int ret=0;
   fprintf(stderr, "Starting to decode the streams\n");
   while(true){
-    err_ret=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
-    if (err_ret==AVERROR_EOF){ // Handle the last demuxing error that happened at the time of while loop end
-      fprintf(stderr, "End of File reached: %s. Completed decoding of the whole File.\n", target_track_path);
+    ret=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
+    if (ret==AVERROR_EOF){ // Handle the last demuxing retor that happened at the time of while loop end
+      //fprintf(stderr, "End of File reached: %s. Completed decoding of the whole File.\n", target_track_path);
       goto closing;
-    }else if (err_ret!=0){
-      fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, Error code: %d\n",  target_track_path, err_ret);
+    }else if (ret!=0){
+      fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, retor code: %d\n",  target_track_path, ret);
       goto closing;
     }
     pthread_testcancel();  
     
     if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
-      err_ret=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket); 
-      if (err_ret==AVERROR(EINVAL) || err_ret!=0){
-        fprintf(stderr, "Error occured while trying to feed the decoder datapackets\n");
+      ret=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket); 
+      if (ret!=0){
+        fprintf(stderr, "Error occured while trying to feed the decoder datapackets.Error: %s\n", av_err2str(ret));
         av_packet_unref(datapacket);// clean the packet after use
         goto closing;
       }
       while(true){
-        err_ret=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein); //Retrieve a frame from the decoder that was feeded previously. This continues until there is an error in the avcodec_receive frame return method
-        if (err_ret==AVERROR(EAGAIN) || err_ret==AVERROR_EOF){
+        ret=avcodec_receive_frame(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], dataframein); //Retrieve a frame from the decoder that was feeded previously. This continues until there is an error in the avcodec_receive frame return method
+        if (ret==AVERROR(EAGAIN) || ret==AVERROR_EOF){
           break;
-        }else if (err_ret!=0){ // EINVAL cannot happen but still excluded just for debugging purposes.
-          fprintf(stderr, "Error while receiving frames from the decoder. Error :%d\n", err_ret);
+        }else if (ret!=0){ // EINVAL cannot happen but still excluded just for debugging purposes.
+          fprintf(stderr, "Error while receiving frames from the decoder. retor :%d\n", ret);
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
           av_packet_unref(datapacket);// clean the packet after use
           goto closing;
         }
 
         /*
-        * If the swrctarget_track_path start of decoding an audio frame configure it and initialize the resampler.
+        * If the swr resampler is starting not configured, configure it and initialize the resampler.
         * This reconfiguration is done with the configure_resampler() helper function. 
         */
         if (!swr_is_initialized(resampler) && configure_resampler(track_number)!=0){
@@ -295,10 +296,10 @@ void * play(void *args){
         dataframeout->format=AV_SAMPLE_FMT_FLT;
         dataframeout->ch_layout=(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO; 
 
-        err_ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
-        if (err_ret!=0){
-          if (err_ret!=AVERROR_EOF){
-            fprintf(stderr, "Error while converting frames using resampler. Error: %d\n", err_ret); //Error while configuring resampler so aborting the process entirely
+        ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
+        if (ret!=0){
+          if (ret!=AVERROR_EOF){
+            fprintf(stderr, "retor while converting frames using resampler. retor: %d\n", ret); //retor while configuring resampler so aborting the process entirely
           }
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
           av_packet_unref(datapacket);
@@ -318,7 +319,7 @@ void * play(void *args){
   closing:
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
-    inputs->result=err_ret;
+    inputs->result=ret;
     //pthread_mutex_lock(&inputs->state_var_mutex);
     inputs->is_running=false;
     //pthread_mutex_unlock(&inputs->state_var_mutex);
