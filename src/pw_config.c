@@ -54,9 +54,8 @@ void on_process(void *data){
     if (required_bytes>received_bytes){
       memset(data_buff+received_bytes, 0, required_bytes-received_bytes);
     }
-    fprintf(stderr, "Received %d bytes of data from the pipe\n", (int) received_bytes);
   }else if (errno!=EAGAIN){
-    fprintf(stderr, "Some unforseen error happened.Error: %s\n", strerror(errno));
+    fprintf(stderr, "Error occured while receiving data from the pipe.Error: %s\n", strerror(errno));
     buff->buffer->datas[0].chunk->offset=0;
     buff->buffer->datas[0].chunk->stride=stride;
     buff->buffer->datas[0].chunk->size=0;

@@ -112,7 +112,7 @@ int read_audio_file_header(const int track_number, const char *track_path){
     fprintf(stderr, "Error inspecting stream information for the audio trcak: %s. Error:%s\n", track_path, av_err2str(ret));
     return -1;
   }
-  av_dump_format(trackcontext_buffer[track_number-1], -1, NULL, 0);
+  //av_dump_format(trackcontext_buffer[track_number-1], -1, NULL, 0);
   return 0;
 }
 
