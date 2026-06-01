@@ -10,21 +10,21 @@
 #include "config_reader.h"
 #include "String.h"
 
-int64_t index(char *str, const char search_term){
+size_t index(char *str, const char search_term){
     /*This function searches for a particular search_term char in the given string
     * returns -1 on failure to find the search_term or index of the char in the string.
     * In order for this function to work properly the given string has to null-terminated.
     */
-    int64_t total_len=strlen(str);
+    size_t total_len=strlen(str);
     char *idx=strchr(str, search_term);
     if (idx==NULL){ //Search term doesn't exist in the string
         return -1;
     }
-    int64_t split_len=strlen(idx);
-    return (int64_t) total_len-split_len;
+    size_t split_len=strlen(idx);
+    return total_len-split_len;
 }
 
-uint8_t extract_right_side(char *src, String **target_buffer, const char splitter){
+int8_t extract_right_side(char *src, String **target_buffer, const char splitter){
     /*
      * Split the given src string at the splitter character and copy the right side of the split string in the target_buffer.
      * Return: -ve return value for any internal error and 0 when successful.
