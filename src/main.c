@@ -183,8 +183,8 @@ int main(int argc, char  *argv[]){
    * Initialize the pipewire config and connnect the stream with the help of the context object 
    * on a seperate thread so as to not block the main function execution.
   */
-  pthread_t t1;
-  if (pthread_create(&t1, nullptr, init_pipewire, &pipeline[0])!=0){
+  pthread_t pw_thread;
+  if (pthread_create(&pw_thread, nullptr, init_pipewire, &pipeline[0])!=0){
     fprintf(stderr, "Launching pipewire failed.\n");
     goto cleanup_exit;
     return 1;
@@ -199,11 +199,28 @@ int main(int argc, char  *argv[]){
 
   PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false, .config=config_map}; 
   uint8_t input;
+  pthread_t audio_thread;
   while(true){
     if (read(serial_port_fd, &input, 1)>0){
-      audio_input.track_number=input-(int)'0';
+      pthread_mutex_lock(&audio_input.track_input_mutex);
+      audio_input.track_number=input-(int)'0'; // read the serial input data. we have to do it with mutex locks around the operation as the  same shared varibale in the PlayInput struct may be at the same time be read by the already running audio thread.
+      pthread_mutex_unlock(&audio_input.track_input_mutex);
       fprintf(stderr, "Serial input data received: %d\n", audio_input.track_number);
-      play(&audio_input);
+
+      while (true){ // Wait till the running thread exists itself
+        pthread_mutex_lock(&audio_input.state_var_mutex);
+        if (audio_input.is_running==false){
+          pthread_mutex_unlock(&audio_input.state_var_mutex);
+          break;
+        }
+        pthread_mutex_unlock(&audio_input.state_var_mutex);
+        fprintf(stderr, "Waiting for the running audio thread to exit.\n");
+      }
+
+      if (pthread_create(&audio_thread, nullptr, play, &audio_input)!=0){
+        fprintf(stderr, "Launching a new audio thread failed.\n");
+        continue;
+      }
     }
   }
   cleanup_exit:

@@ -14,7 +14,7 @@
 #include <libswresample/swresample.h>
 #include <libavutil/opt.h>
 
-typedef struct streamcontext{ // A struct to hold the various streamcodectx for each tracks 
+typedef struct { // A struct to hold the various streamcodectx for each tracks 
             int nb_streams; // Number of streams for i th indexed file 
             AVCodecContext **streamctx; // array of codectx for this particular file's streams
 }StreamContext;
@@ -122,7 +122,7 @@ int get_avcodec_decoder(const int track_number){
    * If succesfull returns 0, otherwise -1. The resultant decoders for the streams are stored in the StreamContext buffer at package level along 
    * with the number of streams for each of the audio files.
    */
-  int nb=trackcontext_buffer[track_number-1]->nb_streams; // number of streams in the file
+  const int nb=trackcontext_buffer[track_number-1]->nb_streams; // number of streams in the file
   track_stream_ctx_buffer[track_number-1].nb_streams=nb;
   if ((track_stream_ctx_buffer[track_number-1].streamctx=calloc(nb, sizeof(AVCodecContext*)))==NULL){
     fprintf(stderr, "Error allocating AVCodecContext buffer array for the file: %d\n", track_number);
@@ -193,13 +193,32 @@ void write_to_pipe(const int pipe_write_fd){
   }
 }
 
+void thread_cleanup_handler(void *args){
+  PlayInput *input_args=(PlayInput *)args;
+  pthread_mutex_unlock(&input_args->track_input_mutex);
+  swr_close(resampler); 
+  av_frame_unref(dataframeout);
+  av_frame_unref(dataframein);
+  av_packet_unref(datapacket);
+  pthread_mutex_lock(&input_args->state_var_mutex);
+  input_args->is_running=false;
+  pthread_mutex_unlock(&input_args->state_var_mutex);
+}
+
+bool is_current_input_changed(const int8_t previnput, PlayInput *currentinput){
+  pthread_mutex_lock(&currentinput->track_input_mutex);
+  bool result=previnput==currentinput->track_number?false:true;
+  pthread_mutex_unlock(&currentinput->track_input_mutex);
+  return result;
+}
+
 void * play(void *args){
   /*
-    * This function expeects pointer to a PlayInput value which will contain the neccessary details for input mapping.
+    * This function expects pointer to a PlayInput struct which will contain the neccessary details for input mapping.
   */
   PlayInput *inputs=(PlayInput *)args; 
   
-  //pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
+  pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
   if (track_number<=0 || track_number>inputs->config->total_number_of_inputs){
     fprintf(stderr, "The given input is outside the predefine inputs.\n");
@@ -213,61 +232,72 @@ void * play(void *args){
     return inputs;
   } 
   char *target_track_path=inputs->config->audio_mapping_arr[track_number-1]->str;
-  bool is_changed=inputs->config->is_audio_map_changed[track_number-1];
-  inputs->config->is_audio_map_changed[track_number-1]=false;
+  pthread_mutex_unlock(&inputs->track_input_mutex);
 
-  //pthread_mutex_unlock(&inputs->track_input_mutex);
   
-  //pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running by the shared variable
+  pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running with the shared variable
   inputs->is_running=true;
-  //pthread_mutex_unlock(&inputs->state_var_mutex);
+  pthread_mutex_unlock(&inputs->state_var_mutex);
 
   fprintf(stderr, "Input track number received: %d\n", track_number);
+  if (is_current_input_changed(track_number, inputs)){
+    goto closing;
+  }
    
-  pthread_testcancel();  
-  if (trackcontext_buffer[track_number-1]==NULL ||  is_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
+  if (trackcontext_buffer[track_number-1]==nullptr){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
     if (read_audio_file_header(track_number, target_track_path)!=0){
-      fprintf(stderr, "Aborting the play function. retor in reading audio file header data.\n\n");
+      fprintf(stderr, "Aborting the play function. Error in reading audio file header data.\n\n");
       inputs->result=-1;
-      //pthread_mutex_lock(&inputs->state_var_mutex);
+      pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
-      //pthread_mutex_unlock(&inputs->state_var_mutex);
+      pthread_mutex_unlock(&inputs->state_var_mutex);
       return inputs;
     }
+  }else{ //setting the AvFormatContext object to point to the first frame 
+    av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD);
   }
   fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
+  if (is_current_input_changed(track_number, inputs)){
+    goto closing;
+  }
 
-  pthread_testcancel();  
-  if (track_stream_ctx_buffer[track_number-1].streamctx==NULL || is_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
+  if (track_stream_ctx_buffer[track_number-1].streamctx==nullptr){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
      if (get_avcodec_decoder(track_number)!=0){
-      fprintf(stderr, "Aborting the play function. retor in getting the decoders for the audio file streams.\n");
+      fprintf(stderr, "Aborting the play function. Error in getting the decoders for the audio file streams.\n");
       inputs->result=-1;
-      //pthread_mutex_lock(&inputs->state_var_mutex);
+      pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
-      //pthread_mutex_unlock(&inputs->state_var_mutex);
+      pthread_mutex_unlock(&inputs->state_var_mutex);
       return inputs;
      }
   }
-  pthread_testcancel();  // Another exit point from this function
+  if (is_current_input_changed(track_number, inputs)){
+    goto closing;
+  }
 
   int ret=0;
   fprintf(stderr, "Starting to decode the streams\n");
   while(true){
     ret=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
-    if (ret==AVERROR_EOF){ // Handle the last demuxing retor that happened at the time of while loop end
+    if (ret==AVERROR_EOF){ // Handle the last demuxing error that happened at the time of while loop end
       //fprintf(stderr, "End of File reached: %s. Completed decoding of the whole File.\n", target_track_path);
+      ret=0;
       goto closing;
     }else if (ret!=0){
       fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, retor code: %d\n",  target_track_path, ret);
+      ret=-1;
       goto closing;
     }
-    pthread_testcancel();  
+    if (is_current_input_changed(track_number, inputs)){
+      goto closing;
+    }
     
     if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
       ret=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket); 
       if (ret!=0){
         fprintf(stderr, "Error occured while trying to feed the decoder datapackets.Error: %s\n", av_err2str(ret));
         av_packet_unref(datapacket);// clean the packet after use
+        ret=-1;
         goto closing;
       }
       while(true){
@@ -278,6 +308,7 @@ void * play(void *args){
           fprintf(stderr, "Error while receiving frames from the decoder. retor :%d\n", ret);
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
           av_packet_unref(datapacket);// clean the packet after use
+          ret=-1;
           goto closing;
         }
 
@@ -288,6 +319,7 @@ void * play(void *args){
         if (!swr_is_initialized(resampler) && configure_resampler(track_number)!=0){
           fprintf(stderr, "Could not configure the resampler exiting play function.\n");
           av_packet_unref(datapacket);
+          ret=-1;
           goto closing;
         }
 
@@ -299,8 +331,9 @@ void * play(void *args){
         ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
         if (ret!=0){
           if (ret!=AVERROR_EOF){
-            fprintf(stderr, "retor while converting frames using resampler. retor: %d\n", ret); //retor while configuring resampler so aborting the process entirely
+            fprintf(stderr, "retor while converting frames using resampler. retor: %d\n", ret); //Error while configuring resampler so aborting the process entirely
           }
+          ret=-1;
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
           av_packet_unref(datapacket);
           av_frame_unref(dataframein);
@@ -312,18 +345,22 @@ void * play(void *args){
         av_frame_unref(dataframeout);
         av_frame_unref(dataframein);
       }
+      if (is_current_input_changed(track_number, inputs)){
+        goto closing;
+      }
     }
     av_packet_unref(datapacket);// clean the packet after use
   }
 
   closing:
-    av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD); // Go back to the first to the use next time
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
+    av_frame_unref(dataframeout);
+    av_frame_unref(dataframein);  
+    av_packet_unref(datapacket);
     inputs->result=ret;
-    //pthread_mutex_lock(&inputs->state_var_mutex);
+    pthread_mutex_lock(&inputs->state_var_mutex);
     inputs->is_running=false;
-    //pthread_mutex_unlock(&inputs->state_var_mutex);
+    pthread_mutex_unlock(&inputs->state_var_mutex);
     return inputs;
-  
 }
 
