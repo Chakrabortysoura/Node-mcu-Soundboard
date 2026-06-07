@@ -193,18 +193,6 @@ void write_to_pipe(const int pipe_write_fd){
   }
 }
 
-void thread_cleanup_handler(void *args){
-  PlayInput *input_args=(PlayInput *)args;
-  pthread_mutex_unlock(&input_args->track_input_mutex);
-  swr_close(resampler); 
-  av_frame_unref(dataframeout);
-  av_frame_unref(dataframein);
-  av_packet_unref(datapacket);
-  pthread_mutex_lock(&input_args->state_var_mutex);
-  input_args->is_running=false;
-  pthread_mutex_unlock(&input_args->state_var_mutex);
-}
-
 bool is_current_input_changed(const int8_t previnput, PlayInput *currentinput){
   pthread_mutex_lock(&currentinput->track_input_mutex);
   bool result=previnput==currentinput->track_number?false:true;
