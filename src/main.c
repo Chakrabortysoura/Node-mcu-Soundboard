@@ -140,18 +140,9 @@ int main(int argc, char  *argv[]){
   if (config_map==NULL){
     return 1;
   }
-  FILE *config_file=fopen(config_filename, "rw");
+  FILE *config_file=fopen(config_filename, "r");
   if (config_file==NULL){
-    if (errno==ENONET){
-      if (generate_config()==0){ //Attempts to generate a template for the audio file mapping and save it to the provided config file path incase the config file doesn't exist.
-        fprintf(stderr, "Default config file template generated and saved.\n");
-      }else{
-        fprintf(stderr, "Default config file template generation failed.\n");
-      }
-    }else{
-      fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
-    }
-    fclose(config_file);
+    fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
     return 1;
   }
   size_t len=1024; // Read each line from the text file and parse those line to store the audio mappings for each of the inputs from the serial device.
