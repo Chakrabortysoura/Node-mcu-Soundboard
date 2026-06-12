@@ -119,6 +119,10 @@ int main(int argc, char  *argv[]){
       }
     }
   }
+  if (total_track_number<=0){
+    fprintf(stderr, "Please provide a positive integer value corresponding to the number of inputs coming from the serial device. Usually this means all the numeric value that the serial device can send as an input. Ex- For NodeMcu this can be 6. As we can connect 6 of it's GPIO pins to send 1-6 numeric values when triggered with switches.\n");
+    return 1;
+  }
   if (serial_port==nullptr){
     fprintf(stderr, "Please provide the address to the serial port with the \"-serial\" flag. \n");
     print_help_message();
@@ -127,7 +131,7 @@ int main(int argc, char  *argv[]){
   if (config_filename==nullptr){
     config_filename="config.txt";
   }
-  
+   
   /*
     * Read and parse the configdata provided int the default config file path. 
     * Right now custom config file paths are not acceptable from the command line arguments.
@@ -140,13 +144,14 @@ int main(int argc, char  *argv[]){
   if (config_file==NULL){
     if (errno==ENONET){
       if (generate_config()==0){ //Attempts to generate a template for the audio file mapping and save it to the provided config file path incase the config file doesn't exist.
-        fprintf(stderr, "Default config file template generated.\n");
+        fprintf(stderr, "Default config file template generated and saved.\n");
       }else{
         fprintf(stderr, "Default config file template generation failed.\n");
       }
     }else{
       fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
     }
+    fclose(config_file);
     return 1;
   }
   size_t len=1024; // Read each line from the text file and parse those line to store the audio mappings for each of the inputs from the serial device.
@@ -201,6 +206,9 @@ int main(int argc, char  *argv[]){
   uint8_t input;
   pthread_t audio_thread;
   while(true){
+    if (is_modified(config_map)==1){ // Config file was changed while the programme was running reload the config
+      fprintf(stderr, "Config file modified reloading the the config details.\n"); 
+    }
     if (read(serial_port_fd, &input, 1)>0){
       pthread_mutex_lock(&audio_input.track_input_mutex);
       audio_input.track_number=input-(int)'0'; // read the serial input data. we have to do it with mutex locks around the operation as the  same shared varibale in the PlayInput struct may be at the same time be read by the already running audio thread.
