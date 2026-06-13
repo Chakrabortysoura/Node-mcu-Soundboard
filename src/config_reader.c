@@ -6,30 +6,30 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "config_reader.h"
 #include "String.h"
 
-size_t index(char *str, const char search_term){
+ssize_t index(char *str, const char search_term){
     /*This function searches for a particular search_term char in the given string
     * returns -1 on failure to find the search_term or index of the char in the string.
     * In order for this function to work properly the given string has to null-terminated.
     */
-    size_t total_len=strlen(str);
-    char *idx=strchr(str, search_term);
-    if (idx==NULL){ //Search term doesn't exist in the string
-        return -1;
+    for (ssize_t i=0;i<strlen(str);i++){
+        if (str[i]==search_term){
+            return i;
+        }
     }
-    size_t split_len=strlen(idx);
-    return total_len-split_len;
+    return -1;
 }
 
-int8_t extract_right_side(char *src, String **target_buffer, const char splitter){
+int8_t copy_str_from_split(char *src, String **target_buffer, const char splitter){
     /*
      * Split the given src string at the splitter character and copy the right side of the split string in the target_buffer.
      * Return: -ve return value for any internal error and 0 when successful.
     */
-    int64_t split_idx=index(src, splitter);
+    ssize_t split_idx=index(src, splitter);
     if (split_idx<0){
         fprintf(stderr, "The splitting character was not found in the source string.\n");
         return -1;
@@ -56,7 +56,7 @@ int8_t add_new_mapping(AudioMappings *configs, char *line){
         fprintf(stderr, "Changed detected for the audio file map for the serial input: %d\n", input_number);
         configs->is_audio_map_changed[input_number-1]=true;
     }
-    if (extract_right_side(line, &configs->audio_mapping_arr[input_number-1], ':')!=0){
+    if (copy_str_from_split(line, &configs->audio_mapping_arr[input_number-1], ':')!=0){
         return -2;
     }
     return 0;
