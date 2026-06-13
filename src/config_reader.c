@@ -1,5 +1,8 @@
+//
 // created by souranil on 2/1/2026.
 //
+#define _GNU_SOURCE
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +14,7 @@
 #include "config_reader.h"
 #include "String.h"
 
-ssize_t index(char *str, const char search_term){
+ssize_t split_index(char *str, const char search_term){
     /*This function searches for a particular search_term char in the given string
     * returns -1 on failure to find the search_term or index of the char in the string.
     * In order for this function to work properly the given string has to null-terminated.
@@ -29,7 +32,7 @@ int8_t copy_str_from_split(char *src, String **target_buffer, const char splitte
      * Split the given src string at the splitter character and copy the right side of the split string in the target_buffer.
      * Return: -ve return value for any internal error and 0 when successful.
     */
-    ssize_t split_idx=index(src, splitter);
+    ssize_t split_idx=split_index(src, splitter);
     if (split_idx<0){
         fprintf(stderr, "The splitting character was not found in the source string.\n");
         return -1;
@@ -112,6 +115,28 @@ uint8_t generate_config(){
 		return -1;
 	}
 	return 0;
+}
+
+int8_t parse_config_file(AudioMappings *configmap){
+    FILE *config_file=fopen(configmap->filename->str, "r");
+    if (config_file==NULL){
+        fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
+        return -1;
+    }
+    size_t len=1024; // Read each line from the text file and parse those line to store the audio mappings for each of the inputs from the serial device.
+    char *buffer=calloc(len, sizeof(char));
+    if (buffer==NULL){
+        fprintf(stderr, "Error allocating string buffer for reading context file. Error: %s\n", strerror(errno));
+        return -1;
+    }
+    ssize_t linesize=0;
+    while ((linesize=getline(&buffer, &len, config_file))>0){
+        buffer[linesize-1]='\0';
+        add_new_mapping(configmap, buffer); // Ignoring any error occuring in add_new_mapping as any error related to non-existent audio mapping is handled in the audio module's play function. 
+    }
+    fclose(config_file);
+    free(buffer);
+    return 0; 
 }
 
 int8_t is_modified(const AudioMappings *configs){

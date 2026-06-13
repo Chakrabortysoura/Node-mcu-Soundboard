@@ -52,6 +52,13 @@ void deinit_audio_mapping(AudioMappings *config_map);
 int8_t add_new_mapping(AudioMappings *configs, char *line);
 
 /*
+ * Reads the config txt file and store config audio mappings in the configmap struct. This configmap
+ * struct should be initialized with init_audio_mapping function before passing it to this function. 
+ * Return: -ve for any error and 0 for succesfully parsing the whole file.
+ */
+int8_t parse_config_file(AudioMappings *configmap);
+
+/*
 * Functions to check if the config file was modified since the last time it was read. 
 * Return value: -1 failure, 0 not modified, 1 modified.
 */

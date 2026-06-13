@@ -2,6 +2,7 @@
 // Created by souranil on 7/22/25.
 //
 #define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -131,33 +132,13 @@ int main(int argc, char  *argv[]){
   if (config_filename==nullptr){
     config_filename="config.txt";
   }
-   
-  /*
-    * Read and parse the configdata provided int the default config file path. 
-    * Right now custom config file paths are not acceptable from the command line arguments.
-    */
+  
+  //Read the config data from the configfile provided by the path.
   config_map=init_audio_mapping(config_filename, total_track_number);
   if (config_map==NULL){
     return 1;
   }
-  FILE *config_file=fopen(config_filename, "r");
-  if (config_file==NULL){
-    fprintf(stderr, "Opening config failed. Error: %s\n", strerror(errno));
-    return 1;
-  }
-  size_t len=1024; // Read each line from the text file and parse those line to store the audio mappings for each of the inputs from the serial device.
-  char *buffer=calloc(len, sizeof(char));
-  if (buffer==NULL){
-    fprintf(stderr, "Error allocating string buffer for reading context file. Error: %s\n", strerror(errno));
-    return 1;
-  }
-  ssize_t linesize=0;
-  while ((linesize=getline(&buffer, &len, config_file))>0){
-    buffer[linesize-1]='\0';
-    add_new_mapping(config_map, buffer); // Ignoring any error occuring in add_new_mapping as any error related to non-existent audio mapping is handled in the audio module's play function. 
-  }
-  fclose(config_file);
-  free(buffer);
+  parse_config_file(config_map); 
 
   /*
     * Initialize the Unix pipes for inter thread communication between the main thread decoding and resampling audio streams
