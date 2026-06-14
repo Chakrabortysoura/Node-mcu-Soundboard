@@ -136,6 +136,7 @@ int main(int argc, char  *argv[]){
   //Read the config data from the configfile provided by the path.
   config_map=init_audio_mapping(config_filename, total_track_number);
   if (config_map==NULL){
+    fprintf(stderr, "Aborting the programme. Unable to create the audiomappig object.\n");
     return 1;
   }
   parse_config_file(config_map); 

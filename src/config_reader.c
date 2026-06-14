@@ -73,16 +73,22 @@ AudioMappings * init_audio_mapping(const char *config_filename, const uint8_t nu
         return NULL; 
     }
     newobj->filename=init_string_from_src(config_filename);
+    if (newobj->filename==nullptr){
+        free(newobj);
+        return NULL;
+    }
     newobj->total_number_of_inputs=number_of_inputs;
     newobj->audio_mapping_arr=(String **)calloc(number_of_inputs, sizeof(String *));
     if (newobj->audio_mapping_arr==NULL){
         fprintf(stderr, "String buffer allocation failed during AudioMapping allocation. Error: %s\n", strerror(errno));
+        deinit_string(newobj->filename);
         free(newobj);
         return NULL;
     }
     newobj->is_audio_map_changed=(bool *)calloc(number_of_inputs, sizeof(bool));
     if (newobj->is_audio_map_changed==NULL){
         fprintf(stderr, "Unable to allocate the is_audio_map_changed flag buffer. Error: %s\n", strerror(errno));
+        deinit_string(newobj->filename);
         free(newobj->audio_mapping_arr);
         free(newobj);
         return NULL;
