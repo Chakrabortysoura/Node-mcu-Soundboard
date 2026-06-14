@@ -11,7 +11,7 @@
 * This implementation is only to be used for this project so there maybe some missing functionalities.
 */
 typedef struct{
-  size_t len, size;
+  size_t len;
   char *str;
 }String;
 

@@ -23,8 +23,7 @@ String * init_string_from_src(const char *src){
     free(result);
     return NULL;
   }
-  result->size=strlen(src)+10;
-  result->len=result->size-10;
+  result->len=strlen(src);
   return result; 
 }
 
