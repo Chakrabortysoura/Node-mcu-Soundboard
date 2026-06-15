@@ -72,7 +72,8 @@ int main(int argc, char  *argv[]){
   signal(SIGKILL, termination_handler);
   signal(SIGSTOP, termination_handler);
   
-  char homepath[1024];
+  const size_t buff_len=strlen(getenv("HOME"))+strlen("/.config/soundboard");
+  char homepath[buff_len+1];
   if (sprintf(homepath, "%s/.config/soundboard", getenv("HOME"))<=0){ // Get the designated config folder in the current user's config directory
     fprintf(stderr, "Error getting home path of the current user\n");
     return 1;
