@@ -208,33 +208,40 @@ void * play(void *args){
   
   pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
-  if (track_number<=0 || track_number>inputs->config->total_number_of_inputs){
-    fprintf(stderr, "The given input is outside the predefined inputs.\n");
-    inputs->result=-1;
-    pthread_mutex_unlock(&inputs->track_input_mutex);
-    return inputs;
-  }
-
-  if (inputs->config->audio_mapping_arr[track_number-1]==NULL){
-    fprintf(stderr, "Audio filepath is not mapped in the config for input: %d\n", track_number);
-    inputs->result=-1;
-    pthread_mutex_unlock(&inputs->track_input_mutex);
-    return inputs;
-  } 
-  char *target_track_path=inputs->config->audio_mapping_arr[track_number-1]->str;
   pthread_mutex_unlock(&inputs->track_input_mutex);
 
+  if (track_number<=0 || track_number>inputs->config->total_number_of_inputs){ // If the given input is out of the valid range of inputs
+    fprintf(stderr, "The given input is outside the predefined inputs.\n");
+    inputs->result=-1;
+    return inputs;
+  }
+  fprintf(stderr, "Input track number received: %d\n", track_number);
   
+  pthread_mutex_lock(&inputs->config->config_map_lock);
+  //Check if there is any audio file path mapped to the current input number. 
+  if (inputs->config->audio_mapping_arr[track_number-1]==nullptr){
+    pthread_mutex_unlock(&inputs->config->config_map_lock);
+    fprintf(stderr, "Audio filepath is not mapped in the config for input: %d\n", track_number);
+    inputs->result=-1;
+    return inputs;
+   } 
+  char *target_track_path=strdup(inputs->config->audio_mapping_arr[track_number-1]->str);
+  bool is_config_changed=inputs->config->is_audio_map_changed[track_number-1];
+  pthread_mutex_unlock(&inputs->config->config_map_lock);
+  if (target_track_path==nullptr){
+    fprintf(stderr, "Failed to copy the mapped filename from config data. Error: %s\n", strerror(errno));
+    goto closing;
+  }
+   
   pthread_mutex_lock(&inputs->state_var_mutex); //Setting the thread state to running with the shared variable
   inputs->is_running=true;
   pthread_mutex_unlock(&inputs->state_var_mutex);
-
-  fprintf(stderr, "Input track number received: %d\n", track_number);
+  
   if (is_current_input_changed(track_number, inputs)){
     goto closing;
   }
    
-  if (trackcontext_buffer[track_number-1]==nullptr){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
+  if (trackcontext_buffer[track_number-1]==nullptr || is_config_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
     if (read_audio_file_header(track_number, target_track_path)!=0){
       fprintf(stderr, "Aborting the play function. Error in reading audio file header data.\n\n");
       inputs->result=-1;
@@ -243,6 +250,9 @@ void * play(void *args){
       pthread_mutex_unlock(&inputs->state_var_mutex);
       return inputs;
     }
+    pthread_mutex_lock(&inputs->config->config_map_lock);
+    inputs->config->is_audio_map_changed[track_number-1]=false;
+    pthread_mutex_unlock(&inputs->config->config_map_lock);
   }else{ //setting the AvFormatContext object to point to the first frame 
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD);
   }
@@ -343,6 +353,7 @@ void * play(void *args){
   }
 
   closing:
+    free(target_track_path);
     swr_close(resampler); // Closes the resampler so that it has to be reinitialized. Necessary for reconfiguring the swrcontext for use with the next audio file. 
     av_frame_unref(dataframeout);
     av_frame_unref(dataframein);  

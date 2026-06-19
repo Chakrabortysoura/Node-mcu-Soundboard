@@ -14,11 +14,12 @@
 #include "config_reader.h"
 #include "String.h"
 
+/*
+* This function searches for a particular search_term char in the given string
+* returns -1 on failure to find the search_term or index of the char in the string.
+* In order for this function to work properly the given string has to null-terminated.
+*/
 ssize_t split_index(char *str, const char search_term){
-    /*This function searches for a particular search_term char in the given string
-    * returns -1 on failure to find the search_term or index of the char in the string.
-    * In order for this function to work properly the given string has to null-terminated.
-    */
     for (ssize_t i=0;i<strlen(str);i++){
         if (str[i]==search_term){
             return i;
@@ -27,27 +28,32 @@ ssize_t split_index(char *str, const char search_term){
     return -1;
 }
 
-int8_t copy_str_from_split(char *src, String **target_buffer, const char splitter){
-    /*
-     * Split the given src string at the splitter character and copy the right side of the split string in the target_buffer.
-     * Return: -ve return value for any internal error and 0 when successful.
-    */
+/*
+* Split the given src string at the splitter character and copy the right side of the split string in the target_buffer.
+* Return: -ve return value for any internal error and 0 when successful.
+*/
+int8_t copy_str_after_split(char *src, String **target_buffer, const char splitter){
     ssize_t split_idx=split_index(src, splitter);
     if (split_idx<0){
         fprintf(stderr, "The splitting character was not found in the source string.\n");
         return -1;
     }
+    // Incase split character is the last character in the line
+    if (split_idx==strlen(src)-1){    
+        fprintf(stderr, "There is nothing after the split character in src string: %s.\n", src);
+        return -2;
+    }
     *target_buffer=init_string_from_src(src+split_idx+1);
     if (target_buffer==NULL){
         fprintf(stderr, "Unable to copy the split string.\n");
-        return -2;
+        return -3;
     }
     return 0;
 }
 
 int8_t add_new_mapping(AudioMappings *configs, char *line){
     if (configs==NULL){
-        fprintf(stderr, "Uninitialized configs data structure.\n");
+        fprintf(stderr, "Uninitialized AudioMappings data structure in configs parameter.\n");
         return -1;
     }
     int8_t input_number=atoi(line); 
@@ -55,12 +61,8 @@ int8_t add_new_mapping(AudioMappings *configs, char *line){
         fprintf(stderr, "Please provide valid number to map audio file to: %s\n", line);
         return -1;
     }
-    if (configs->audio_mapping_arr[input_number-1]!=NULL){
-        fprintf(stderr, "Changed detected for the audio file map for the serial input: %d\n", input_number);
-        configs->is_audio_map_changed[input_number-1]=true;
-    }
-    if (copy_str_from_split(line, &configs->audio_mapping_arr[input_number-1], ':')!=0){
-        return -2;
+    if (copy_str_after_split(line, &configs->audio_mapping_arr[input_number-1], ':')!=0){ //If copying the part after the split character fails the associated audio_mapping_arr element is kept NULL.
+        return -1;
     }
     return 0;
 }
@@ -80,7 +82,7 @@ AudioMappings * init_audio_mapping(const char *config_filename, const uint8_t nu
     newobj->total_number_of_inputs=number_of_inputs;
     newobj->audio_mapping_arr=(String **)calloc(number_of_inputs, sizeof(String *));
     if (newobj->audio_mapping_arr==NULL){
-        fprintf(stderr, "String buffer allocation failed during AudioMapping allocation. Error: %s\n", strerror(errno));
+        fprintf(stderr, "String buffer allocation failed during AudioMapping initialization. Error: %s\n", strerror(errno));
         deinit_string(newobj->filename);
         free(newobj);
         return NULL;
@@ -140,6 +142,10 @@ int8_t parse_config_file(AudioMappings *configmap){
         buffer[linesize-1]='\0';
         add_new_mapping(configmap, buffer); // Ignoring any error occuring in add_new_mapping as any error related to non-existent audio mapping is handled in the audio module's play function. 
     }
+    for(size_t i=0;i<configmap->total_number_of_inputs;i++){
+        configmap->is_audio_map_changed[i]=(configmap->audio_mapping_arr[i]!=nullptr);
+    }
+    configmap->last_read=time(NULL);
     fclose(config_file);
     free(buffer);
     return 0; 
@@ -158,6 +164,19 @@ int8_t is_modified(const AudioMappings *configs){
     const time_t last_modified=fileparams.st_mtime;
     if (difftime(last_modified, configs->last_read)>0){ // Compare to check if the file was modified since the last read of the config data
         return 1;
+    }
+    return 0;
+}
+
+int8_t reparse_config_file(AudioMappings *configmap){
+    for(size_t i=0;i<configmap->total_number_of_inputs;i++){
+        deinit_string(configmap->audio_mapping_arr[i]);
+    }
+    if (parse_config_file(configmap)!=0){
+        return -1;
+    }
+    for(size_t i=0;i<configmap->total_number_of_inputs;i++){
+        configmap->is_audio_map_changed[i]=(configmap->audio_mapping_arr[i]!=nullptr);
     }
     return 0;
 }

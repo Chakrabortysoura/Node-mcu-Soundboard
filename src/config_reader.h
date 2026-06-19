@@ -26,9 +26,11 @@ uint8_t generate_config();
 typedef struct{
 	String *filename; // Filename of the source config file provided for the audio mappings.
 	uint8_t total_number_of_inputs;	
+	// The main that needs to be acquired when accessing the audio file mapping data from any istance of this struct.
+	pthread_mutex_t config_map_lock;
 	// Array containing the filename in the target edirectory for the serial audio inputs
 	String **audio_mapping_arr;
-	// Boolean array to indicate whether audio file mapping for a particular serial input was modified
+	// Boolean flag to indicate whether audio file mapping for a particular serial input was modified
 	bool *is_audio_map_changed;
 	// to keep track of when the configs were last read from the file and updated in programme's memory
 	time_t last_read;
@@ -47,11 +49,6 @@ AudioMappings * init_audio_mapping(const char *config_filename, const uint8_t nu
 void deinit_audio_mapping(AudioMappings *config_map);
 
 /*
- * Add a new serial input to audio file mapping in the existing audio mapping struct
- */
-int8_t add_new_mapping(AudioMappings *configs, char *line);
-
-/*
  * Reads the config txt file and store config audio mappings in the configmap struct. This configmap
  * struct should be initialized with init_audio_mapping function before passing it to this function. 
  * Return: -ve for any error and 0 for succesfully parsing the whole file.
@@ -64,5 +61,10 @@ int8_t parse_config_file(AudioMappings *configmap);
 */
 int8_t is_modified(const AudioMappings *configs);
 
+/*
+* This function again parses the configfile already provided in the configmap filename property. 
+* If any entry in the configmap is changes it sets the corresponding is_audio_map_changed to true.
+*/
+int8_t reparse_config_file(AudioMappings *configmap);
 
 #endif

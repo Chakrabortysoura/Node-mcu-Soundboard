@@ -23,7 +23,7 @@ static int pipeline[2];
 AudioMappings *config_map;
 
 static inline void print_help_message(){
-  fprintf(stdout, "Command format: soundboard -[required flag] --[optional flag] [argument]\n"
+  printf("Command format: soundboard -[required flag] --[optional flag] [argument]\n"
                   "Available flags and their uses:\n"
                   "-serial     : Path to the serial input device\n"
                   "--config    : Path to the config file\n"
@@ -180,8 +180,11 @@ int main(int argc, char  *argv[]){
   uint8_t input;
   pthread_t audio_thread;
   while(true){
-    if (is_modified(config_map)==1){ // Config file was changed while the programme was running reload the config
-      fprintf(stderr, "Config file modified reloading the the config details.\n"); 
+    if (is_modified(config_map)==1){
+      fprintf(stderr, "Config file was modified since, so reloading the config file.\n");
+      pthread_mutex_lock(&config_map->config_map_lock);
+      reparse_config_file(config_map);
+      pthread_mutex_unlock(&config_map->config_map_lock);
     }
     if (read(serial_port_fd, &input, 1)>0){
       pthread_mutex_lock(&audio_input.track_input_mutex);
