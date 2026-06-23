@@ -43,17 +43,13 @@ static inline bool help_flag_present(const int argc, char *argv[]){
   return false;
 }
 
-void cleanup_handler(){
-  deinit_av_objects(total_track_number); // deinitialize the audio.h package level objects for easy cleanup at the time of exit. 
+void termination_handler(int signal){
+  deinit_av_objects(total_track_number); // deinitialize the audio and pipewire top level objects for easy cleanup at the time of exit. 
   deinit_pipewire();
   deinit_audio_mapping(config_map);
   close(pipeline[0]);
   close(pipeline[1]);
-}
-
-void termination_handler(int signal){
-  cleanup_handler();
-  fprintf(stderr, "Closing the programme\n");
+  printf("Closing the programme\n");
   exit(signal);
 }
 
@@ -87,7 +83,7 @@ int main(int argc, char  *argv[]){
   total_track_number=6;
   const char *serial_port=nullptr, *config_filename=nullptr;
   for(int i=1;i<argc;i++){ 
-    if (strcmp(argv[i], "--err")==0){
+    if (strcmp(argv[i], "--log")==0){
       if (i+1>=argc){
         fprintf(stderr, "No filename provided to remap he stderr to.\n");
         fprintf(stdout, "Stdout couldn't be remaped.\n");
@@ -165,15 +161,13 @@ int main(int argc, char  *argv[]){
   pthread_t pw_thread;
   if (pthread_create(&pw_thread, nullptr, init_pipewire, &pipeline[0])!=0){
     fprintf(stderr, "Launching pipewire failed.\n");
-    goto cleanup_exit;
-    return 1;
+    termination_handler(1);
   }
   
   // Initialize the ffmpeg audio processing header.
   if (init_av_objects(total_track_number)!=0){
     fprintf(stderr, "Error initializing all the av objects\n");
-    goto cleanup_exit;
-    return 1;
+    termination_handler(1);
   }
 
   PlayInput audio_input={.track_number=1, .pipe_write_head=pipeline[1], .is_running=false, .config=config_map}; 
@@ -208,8 +202,5 @@ int main(int argc, char  *argv[]){
       }
     }
   }
-  cleanup_exit:
-    cleanup_handler();
-    fprintf(stderr, "\nClosing the programme\n");
-  return 0;
+  termination_handler(0);
 }
