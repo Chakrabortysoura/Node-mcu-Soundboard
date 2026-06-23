@@ -1,6 +1,6 @@
 # Node Mcu SoundBoard
 
-A c programme that lets user to use NodeMcu(ESP8266)/any similar microcontroller with serial io capabilities to be used as a custom macropad/soundboard to inject audio input in other applications like- Discord or Google meet etc. This project aims to use Linux's pipewire audio server's graph based audio processing capabilities to implement this universal functionality that can work with any application. 
+A c programme that lets user use NodeMcu(ESP8266)/any similar microcontroller with serial io capabilities to be used as a custom macropad/soundboard to inject audio input in other applications like- Discord or Google meet etc. This project aims to use Linux's pipewire audio server's graph based audio processing capabilities to implement this universal functionality that can work with any application. 
 
 
 ## Motivation
@@ -24,7 +24,6 @@ Current goals-
 2. Implementing the logic for auto linking with target applications using the pipewire apis.
 3. A second confiugration parser to specify the target application along with the existing audio file mappings configuration. 
 4. Analysis with Valigrind to detect to potential memoery leaks in some parts of the applicaiton. 
-5. Implementing the interupt to cancel a playback midway when receiving a new input from the microcontroller.
 
 ## Use of AI
 
