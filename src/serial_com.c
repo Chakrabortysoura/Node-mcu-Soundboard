@@ -4,14 +4,16 @@
 #define _GNU_SOURCE
 
 #include "serial_com.h"
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <fcntl.h>  // For using File control related macros and functions in glibc
 #include <unistd.h> // For unix specific functionalities from glibc
 #include <errno.h>  // For Error handling
 #include <string.h> 
 #include <sys/ioctl.h>
 #include <termios.h>
+
+#include "logging_str.h"
 
 int init_serial_port(const char *serial_port_path){
   /*
@@ -24,12 +26,12 @@ int init_serial_port(const char *serial_port_path){
 
   const int serial_port_fd=open(serial_port_path ,O_RDONLY|O_NOCTTY); // File descriptor obtained for the usb to com port used for communicating with the nodemcu
   if (serial_port_fd<=0) { // Exit the programme when the serial port file descriptor couldn't be obtained
-    perror(strerror(errno));
+    fprintf(stderr, "%sError while opening serial device. Error: %s\n", error_log_str(),strerror(errno));
     return -1;
   }
   struct termios port_config;
   if (tcgetattr(serial_port_fd, &port_config)==-1){// Get the termios struct associated with serial port
-    perror(strerror(errno));
+    fprintf(stderr, "%sError while getting termios struct values from the serial device. Error: %s\n", error_log_str(),strerror(errno));
     return -1;
   }
   
@@ -40,11 +42,11 @@ int init_serial_port(const char *serial_port_path){
   cfsetspeed(&port_config, B115200);
 
   if (tcsetattr(serial_port_fd, TCSANOW, &port_config )==-1){// Set the new serial port config
-    perror(strerror(errno));
+    fprintf(stderr, "%sError setting the termios struct values from the serial device. Error: %s\n", error_log_str(),strerror(errno));
     return -1;
   }
   if (tcflush(serial_port_fd, TCIOFLUSH)!=0){ //Flush any previous data in the input buffer for the serial port
-    perror("Serial port queue flush Error");
+    fprintf(stderr, "%sError flushing the serial device queue. Error: %s\n", error_log_str(),strerror(errno));
     return -1;
   }
   
@@ -53,9 +55,8 @@ int init_serial_port(const char *serial_port_path){
 
 int close_serial_port(const int serial_port_fd){
   /*
-   * Closing the opened serial port file descriptor when no longer
+   * Closing the open serial port file descriptor when no longer
    * needed for readign serial port input data
   */
-
   return close(serial_port_fd);
 }

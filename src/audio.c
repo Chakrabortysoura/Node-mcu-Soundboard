@@ -2,6 +2,7 @@
 // Created by souranil on 7/22/25.
 //
 #define _GNU_SOURCE
+
 #include "audio.h"
 #include <stdio.h>
 #include <errno.h>
@@ -13,6 +14,8 @@
 #include <libavutil/error.h>
 #include <libswresample/swresample.h>
 #include <libavutil/opt.h>
+
+#include "logging_str.h"
 
 typedef struct { // A struct to hold the various streamcodectx for each tracks 
             int nb_streams; // Number of streams for i th indexed file 
@@ -31,29 +34,29 @@ int8_t init_av_objects(const int total_track_number){
    * exits with the proper error message. 
   */
   if ((trackcontext_buffer=calloc(total_track_number, sizeof(AVFormatContext *)))==NULL){
-    fprintf(stderr, "Unable to allocate av context buffer for all the files\n");
+    fprintf(stderr, "%sUnable to allocate av context buffer for all the files\n", error_log_str());
     return -1;
   }
   if ((dataframein=av_frame_alloc())==NULL){
-    fprintf(stderr, "Unable to allocate av frame\n");
+    fprintf(stderr, "%sUnable to allocate av frame\n", error_log_str());
     free(trackcontext_buffer);
     return -1;
   }
   if ((dataframeout=av_frame_alloc())==NULL){
-    fprintf(stderr, "Unable to allocate av frame\n");
+    fprintf(stderr, "%sUnable to allocate av frame\n", error_log_str());
     av_frame_free(&dataframein);
     free(trackcontext_buffer);
     return -1;
   }
   if ((datapacket=av_packet_alloc())==NULL){
-    fprintf(stderr, "Unable to allocate av packet\n");
+    fprintf(stderr, "%sUnable to allocate av packet\n", error_log_str());
     av_frame_free(&dataframein);
     av_frame_free(&dataframeout);
     free(trackcontext_buffer);
     return -1;
   }
   if ((resampler=swr_alloc())==NULL){
-    fprintf(stderr, "Failed to initialized the ffmpeg resampler object\n");
+    fprintf(stderr, "%sFailed to initialized the ffmpeg resampler object\n", error_log_str());
     av_frame_free(&dataframein);
     av_frame_free(&dataframeout);
     av_packet_free(&datapacket);
@@ -61,7 +64,7 @@ int8_t init_av_objects(const int total_track_number){
     return -1;
   }
   if ((track_stream_ctx_buffer=calloc(total_track_number, sizeof(StreamContext)))==NULL){
-    fprintf(stderr, "Unable to allocate trackcontext buffer\n");
+    fprintf(stderr, "%sUnable to allocate trackcontext buffer\n", error_log_str());
     av_frame_free(&dataframein);
     av_frame_free(&dataframeout);
     av_packet_free(&datapacket);
@@ -98,18 +101,18 @@ int read_audio_file_header(const int track_number, const char *track_path){
    */
   int ret=0;
   if ((trackcontext_buffer[track_number-1]=avformat_alloc_context())==NULL){
-    fprintf(stderr, "AVFormat context allocation failed for track number: %d\n", track_number);
+    fprintf(stderr, "%sAVFormat context allocation failed for track number: %d\n", error_log_str(), track_number);
     return -1;
   } 
   
   ret=avformat_open_input(&trackcontext_buffer[track_number-1], track_path, NULL, NULL);
   if (ret<0){
-    fprintf(stderr, "Error when trying to open the audio file: %s. Error: %s\n", track_path, av_err2str(ret));
+    fprintf(stderr, "%sError when trying to open the audio file: %s. Error: %s\n", error_log_str(), track_path, av_err2str(ret));
     return -1;
   }
   ret=avformat_find_stream_info(trackcontext_buffer[track_number-1], NULL);
   if (ret<0){
-    fprintf(stderr, "Error inspecting stream information for the audio trcak: %s. Error:%s\n", track_path, av_err2str(ret));
+    fprintf(stderr, "%sError inspecting stream information for the audio trcak: %s. Error:%s\n", error_log_str(), track_path, av_err2str(ret));
     return -1;
   }
   //av_dump_format(trackcontext_buffer[track_number-1], -1, NULL, 0);
@@ -125,17 +128,17 @@ int get_avcodec_decoder(const int track_number){
   const int nb=trackcontext_buffer[track_number-1]->nb_streams; // number of streams in the file
   track_stream_ctx_buffer[track_number-1].nb_streams=nb;
   if ((track_stream_ctx_buffer[track_number-1].streamctx=calloc(nb, sizeof(AVCodecContext*)))==NULL){
-    fprintf(stderr, "Error allocating AVCodecContext buffer array for the file: %d\n", track_number);
+    fprintf(stderr, "%sError allocating AVCodecContext buffer array for the file: %d\n", error_log_str(), track_number);
     return -1;
   }
   for(int i=0;i<nb;i++){
     if ((track_stream_ctx_buffer[track_number-1].streamctx[i]=avcodec_alloc_context3(NULL))==NULL){
-      fprintf(stderr, "Internal error allocating AVCodecContext object for the %d stream for audio file: %d", i, track_number);
+      fprintf(stderr, "%sInternal error allocating AVCodecContext object for the %d stream for audio file: %d", error_log_str(), i, track_number);
       return -1;
     }
     int ret=avcodec_open2(track_stream_ctx_buffer[track_number-1].streamctx[i], avcodec_find_decoder(trackcontext_buffer[track_number-1]->streams[i]->codecpar->codec_id),NULL);
     if (ret!=0){
-      fprintf(stderr, "Error finding the decoder for stream no:%d in track no:%d.Error: %s\n", i, track_number, av_err2str(ret));
+      fprintf(stderr, "%sError finding the decoder for stream no:%d in track no:%d.Error: %s\n", error_log_str(), i, track_number, av_err2str(ret));
       return -1;
     }
   }
@@ -157,13 +160,13 @@ int configure_resampler(const int track_number){
   ret|=av_opt_set_sample_fmt(resampler, "in_sample_fmt", dataframein->format, 0);
   ret|=av_opt_set_sample_fmt(resampler, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
   if (ret!=0){
-    fprintf(stderr, "Failed to configure the resampler parameters. Error: %s\n", av_err2str(ret));
+    fprintf(stderr, "%sFailed to configure the resampler parameters. Error: %s\n", error_log_str(), av_err2str(ret));
     return -1;
   }
   //Initialize the resampler for use in play function
   ret=swr_init(resampler);
   if (ret!=0){
-    fprintf(stderr, "Error when initializing the resampler. Track number: %d. Error:%s\n", track_number, av_err2str(ret));
+    fprintf(stderr, "%sError when initializing the resampler. Track number: %d. Error:%s\n", error_log_str(), track_number, av_err2str(ret));
     return -1;
   }
   return 0;
@@ -187,7 +190,7 @@ void write_to_pipe(const int pipe_write_fd){
       remaining-=ret;
     }else if (errno!=EAGAIN){
       // The retor is not due to the pipe having less capacity
-      fprintf(stderr, "Breaking the loop for retor in the pipeline.retor: %s\n", strerror(errno));
+      fprintf(stderr, "%sBreaking the loop for error in the pipeline.Error: %s\n", error_log_str(), strerror(errno));
       break;
     }
   }
@@ -205,23 +208,24 @@ void * play(void *args){
     * This function expects pointer to a PlayInput struct which will contain the neccessary details for input mapping.
   */
   PlayInput *inputs=(PlayInput *)args; 
-  
+  int ret=0; // Used to store all the function call return values later on
+
   pthread_mutex_lock(&inputs->track_input_mutex); //Reading the track input number from the shared playinput struct
   int8_t track_number=inputs->track_number;
   pthread_mutex_unlock(&inputs->track_input_mutex);
 
   if (track_number<=0 || track_number>inputs->config->total_number_of_inputs){ // If the given input is out of the valid range of inputs
-    fprintf(stderr, "The given input is outside the predefined inputs.\n");
+    fprintf(stderr, "%sThe given input is outside the predefined inputs.\n", error_log_str());
     inputs->result=-1;
     return inputs;
   }
-  fprintf(stderr, "Input track number received: %d\n", track_number);
+  fprintf(stderr, "%sInput track number received: %d\n",info_log_str(), track_number);
   
   pthread_mutex_lock(&inputs->config->config_map_lock);
   //Check if there is any audio file path mapped to the current input number. 
   if (inputs->config->audio_mapping_arr[track_number-1]==nullptr){
     pthread_mutex_unlock(&inputs->config->config_map_lock);
-    fprintf(stderr, "Audio filepath is not mapped in the config for input: %d\n", track_number);
+    fprintf(stderr, "%sAudio filepath is not mapped in the config for input: %d\n", error_log_str(), track_number);
     inputs->result=-1;
     return inputs;
    } 
@@ -229,7 +233,7 @@ void * play(void *args){
   bool is_config_changed=inputs->config->is_audio_map_changed[track_number-1];
   pthread_mutex_unlock(&inputs->config->config_map_lock);
   if (target_track_path==nullptr){
-    fprintf(stderr, "Failed to copy the mapped filename from config data. Error: %s\n", strerror(errno));
+    fprintf(stderr, "%sFailed to copy the mapped filename from config data. Error: %s\n", error_log_str(), strerror(errno));
     goto closing;
   }
    
@@ -243,7 +247,7 @@ void * play(void *args){
    
   if (trackcontext_buffer[track_number-1]==nullptr || is_config_changed){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
     if (read_audio_file_header(track_number, target_track_path)!=0){
-      fprintf(stderr, "Aborting the play function. Error in reading audio file header data.\n\n");
+      fprintf(stderr, "%sAborting the play function. Error in reading audio file header data.\n", error_log_str());
       inputs->result=-1;
       pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
@@ -251,19 +255,19 @@ void * play(void *args){
       return inputs;
     }
     pthread_mutex_lock(&inputs->config->config_map_lock);
-    inputs->config->is_audio_map_changed[track_number-1]=false;
+    inputs->config->is_audio_map_changed[track_number-1]=false; // The newly edited config map has been read once
     pthread_mutex_unlock(&inputs->config->config_map_lock);
-  }else{ //setting the AvFormatContext object to point to the first frame 
+  }else{ //setting the AvFormatContext object to point to the first frame. This is important if we had previously read some frames from the audio file
     av_seek_frame(trackcontext_buffer[track_number-1], -1, 0, AVSEEK_FLAG_BACKWARD);
   }
-  fprintf(stderr, "Context data obtained from the file: %s\n", target_track_path);
+  fprintf(stderr, "%sContext data obtained from the file: %s\n",info_log_str(), target_track_path);
   if (is_current_input_changed(track_number, inputs)){
     goto closing;
   }
 
   if (track_stream_ctx_buffer[track_number-1].streamctx==nullptr){ // Either we haven't read the target audio file once or the audio mapping config data has changed.
      if (get_avcodec_decoder(track_number)!=0){
-      fprintf(stderr, "Aborting the play function. Error in getting the decoders for the audio file streams.\n");
+      fprintf(stderr, "%sAborting the play function. Error in getting the decoders for the audio file streams.\n", error_log_str());
       inputs->result=-1;
       pthread_mutex_lock(&inputs->state_var_mutex);
       inputs->is_running=false;
@@ -275,8 +279,7 @@ void * play(void *args){
     goto closing;
   }
 
-  int ret=0;
-  fprintf(stderr, "Starting to decode the streams\n");
+  fprintf(stderr, "%sStarting to decode the streams\n",info_log_str());
   while(true){
     ret=av_read_frame(trackcontext_buffer[track_number-1], datapacket);
     if (ret==AVERROR_EOF){ // Handle the last demuxing error that happened at the time of while loop end
@@ -284,7 +287,7 @@ void * play(void *args){
       ret=0;
       goto closing;
     }else if (ret!=0){
-      fprintf(stderr, "Some unknwon error while reading packets from the file: %s\n, retor code: %d\n",  target_track_path, ret);
+      fprintf(stderr, "%sSome unknwon error while reading packets from the file: %s\n, retor code: %d\n", error_log_str(),  target_track_path, ret);
       ret=-1;
       goto closing;
     }
@@ -295,7 +298,7 @@ void * play(void *args){
     if (trackcontext_buffer[track_number-1]->streams[datapacket->stream_index]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){ 
       ret=avcodec_send_packet(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index], datapacket); 
       if (ret!=0){
-        fprintf(stderr, "Error occured while trying to feed the decoder datapackets.Error: %s\n", av_err2str(ret));
+        fprintf(stderr, "%sError occured while trying to feed the decoder datapackets.Error: %s\n", error_log_str(), av_err2str(ret));
         av_packet_unref(datapacket);// clean the packet after use
         ret=-1;
         goto closing;
@@ -305,7 +308,7 @@ void * play(void *args){
         if (ret==AVERROR(EAGAIN) || ret==AVERROR_EOF){
           break;
         }else if (ret!=0){ // EINVAL cannot happen but still excluded just for debugging purposes.
-          fprintf(stderr, "Error while receiving frames from the decoder. retor :%d\n", ret);
+          fprintf(stderr, "%sError while receiving frames from the decoder. retor :%d\n", error_log_str(), ret);
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
           av_packet_unref(datapacket);// clean the packet after use
           ret=-1;
@@ -317,7 +320,7 @@ void * play(void *args){
         * This reconfiguration is done with the configure_resampler() helper function. 
         */
         if (!swr_is_initialized(resampler) && configure_resampler(track_number)!=0){
-          fprintf(stderr, "Could not configure the resampler exiting play function.\n");
+          fprintf(stderr, "%sCould not configure the resampler exiting play function.\n", error_log_str());
           av_packet_unref(datapacket);
           ret=-1;
           goto closing;
@@ -331,7 +334,7 @@ void * play(void *args){
         ret=swr_convert_frame(resampler, dataframeout, dataframein); //Resample the incoming audio frame to the desired output
         if (ret!=0){
           if (ret!=AVERROR_EOF){
-            fprintf(stderr, "retor while converting frames using resampler. retor: %d\n", ret); //Error while configuring resampler so aborting the process entirely
+            fprintf(stderr, "%sError while converting frames using resampler. Error: %d\n", error_log_str(), ret); //Error while configuring resampler so aborting the process entirely
           }
           ret=-1;
           avcodec_flush_buffers(track_stream_ctx_buffer[track_number-1].streamctx[datapacket->stream_index]);
