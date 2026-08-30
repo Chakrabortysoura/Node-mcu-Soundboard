@@ -31,6 +31,6 @@ String * init_string_from_src(const char *src);
 /*
   * Deinitialize a string object.
   */
-void deinit_string(String *str);
+void deinit_string(String **str);
 
 #endif
