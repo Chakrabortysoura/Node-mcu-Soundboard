@@ -86,12 +86,12 @@ int main(int argc, char  *argv[]){
   for(int i=1;i<argc;i++){ 
     if (strcmp(argv[i], "--log")==0){
       if (i+1>=argc){
-        fprintf(stderr, "%sNo filename provided remap stderr to. Stdout couldn't be remaped.\n", info_log_str());
+        fprintf(stderr, "%sNo filename provided remap stderr to. Stdout couldn't be remaped.\n", INFO_LOG_STR);
         continue;
       }
       FILE *result=fopen(argv[i+1], "a");
       if (result==NULL){
-        fprintf(stdout, "%sStdout couldn't be remaped to the target file: %s. Error: %s", error_log_str(), argv[i+1], strerror(errno));
+        fprintf(stdout, "%sStdout couldn't be remaped to the target file: %s. Error: %s", ERROR_LOG_STR, argv[i+1], strerror(errno));
       }else{
         fclose(stderr);
         stderr=result;
@@ -100,29 +100,29 @@ int main(int argc, char  *argv[]){
       if (i+1<argc){
         serial_port=argv[i+1]; 
       }else{
-        fprintf(stderr, "%sPlease provide the address to the serial port.\n", error_log_str());
+        fprintf(stderr, "%sPlease provide the address to the serial port.\n", ERROR_LOG_STR);
         return 1;
       }
     }else if (strcmp(argv[i], "--track")==0){
       if (i+1<argc){
         total_track_number=atoi(argv[i+1]);
       }else{
-        fprintf(stderr, "%sDefault total track mapping to 6 as no input was provided.\n", info_log_str());
+        fprintf(stderr, "%sDefault total track mapping to 6 as no input was provided.\n", INFO_LOG_STR);
       }
     }else if (strcmp(argv[i], "--config")==0){
       if (i+1<argc){
         config_filename=argv[i+1];
       }else{
-        fprintf(stderr, "%sDefault config file: config.txt\n", info_log_str());
+        fprintf(stderr, "%sDefault config file: config.txt\n", INFO_LOG_STR);
       }
     }
   }
   if (total_track_number<=0){
-    fprintf(stderr, "%sPlease provide a positive integer value corresponding to the number of inputs coming from the serial device. Usually this means all the numeric value that the serial device can send as an input. Ex- For NodeMcu this can be 6. As we can connect 6 of it's GPIO pins to send 1-6 numeric values when triggered with switches.\n", error_log_str());
+    fprintf(stderr, "%sPlease provide a positive integer value corresponding to the number of inputs coming from the serial device. Usually this means all the numeric value that the serial device can send as an input. Ex- For NodeMcu this can be 6. As we can connect 6 of it's GPIO pins to send 1-6 numeric values when triggered with switches.\n", ERROR_LOG_STR);
     return 1;
   }
   if (serial_port==nullptr){
-    fprintf(stderr, "%sPlease provide the address to the serial port with the \", -serial\" flag. \n", error_log_str());
+    fprintf(stderr, "%sPlease provide the address to the serial port with the \", -serial\" flag. \n", ERROR_LOG_STR);
     print_help_message();
     return 1;
   }
@@ -133,7 +133,7 @@ int main(int argc, char  *argv[]){
   //Read the config data from the configfile provided by the path.
   config_map=init_audio_mapping(config_filename, total_track_number);
   if (config_map==NULL){
-    fprintf(stderr, "%sAborting the programme. Unable to create the audiomappig object.\n", error_log_str());
+    fprintf(stderr, "%sAborting the programme. Unable to create the audiomappig object.\n", ERROR_LOG_STR);
     return 1;
   }
   parse_config_file(config_map); 
@@ -143,14 +143,14 @@ int main(int argc, char  *argv[]){
     * and the pipewire stream that is consuming the data coming for playback.
   */
   if (pipe2(pipeline, O_NONBLOCK)!=0){ // Initiate the pipe file descriptor
-    fprintf(stderr, "%sError while creating pipe for sending the pipewire server data", error_log_str());
+    fprintf(stderr, "%sError while creating pipe for sending the pipewire server data", ERROR_LOG_STR);
     return 1;
   }
   
   // Configure the serial port for io with the given path to the serial device.
   int serial_port_fd=init_serial_port(serial_port);
   if (serial_port_fd<=0){
-    fprintf(stderr, "%sError configuring serial port device.\n", error_log_str());
+    fprintf(stderr, "%sError configuring serial port device.\n", ERROR_LOG_STR);
     return 1;
   }
 
@@ -160,13 +160,13 @@ int main(int argc, char  *argv[]){
   */
   pthread_t pw_thread;
   if (pthread_create(&pw_thread, nullptr, init_pipewire, &pipeline[0])!=0){
-    fprintf(stderr, "%sLaunching pipewire failed.\n", error_log_str());
+    fprintf(stderr, "%sLaunching pipewire failed.\n", ERROR_LOG_STR);
     termination_handler(1);
   }
   
   // Initialize the ffmpeg audio processing header.
   if (init_av_objects(total_track_number)!=0){
-    fprintf(stderr, "%sError initializing all the av objects\n", error_log_str());
+    fprintf(stderr, "%sError initializing all the av objects\n", ERROR_LOG_STR);
     termination_handler(1);
   }
 
@@ -175,7 +175,7 @@ int main(int argc, char  *argv[]){
   pthread_t audio_thread;
   while(true){
     if (is_modified(config_map)==1){
-      fprintf(stderr, "%sConfig file was modified since, so reloading the config file.\n", info_log_str());
+      fprintf(stderr, "%sConfig file was modified since, so reloading the config file.\n", INFO_LOG_STR);
       pthread_mutex_lock(&config_map->config_map_lock);
       reparse_config_file(config_map);
       pthread_mutex_unlock(&config_map->config_map_lock);
@@ -184,20 +184,20 @@ int main(int argc, char  *argv[]){
       pthread_mutex_lock(&audio_input.track_input_mutex);
       audio_input.track_number=input-(int)'0'; // read the serial input data. we have to do it with mutex locks around the operation as the  same shared varibale in the PlayInput struct may be at the same time be read by the already running audio thread.
       pthread_mutex_unlock(&audio_input.track_input_mutex);
-      fprintf(stderr, "%sSerial input data received: %d\n", info_log_str(), audio_input.track_number);
+      fprintf(stderr, "%sSerial input data received: %d\n", INFO_LOG_STR, audio_input.track_number);
 
-      while (true){ // Wait till the running thread exists itself
+      while (true){ // Wait till the running thread exists by itself
         pthread_mutex_lock(&audio_input.state_var_mutex);
         if (audio_input.is_running==false){
           pthread_mutex_unlock(&audio_input.state_var_mutex);
           break;
         }
         pthread_mutex_unlock(&audio_input.state_var_mutex);
-        fprintf(stderr, "%sWaiting for the running audio thread to exit.\n", info_log_str());
+        fprintf(stderr, "%sWaiting for the running audio thread to exit.\n", INFO_LOG_STR);
       }
 
       if (pthread_create(&audio_thread, nullptr, play, &audio_input)!=0){
-        fprintf(stderr, "%sLaunching a new audio thread failed.\n", info_log_str());
+        fprintf(stderr, "%sLaunching a new audio thread failed.\n", INFO_LOG_STR);
         continue;
       }
     }

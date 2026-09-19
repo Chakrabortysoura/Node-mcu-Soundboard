@@ -10,17 +10,13 @@
  * Return the string "INFO" colored with ansi escape code to appear blue in 
  * error logs.
  */
-static inline char * info_log_str(){
-  return "\x1b[38;2;3;186;252m[INFO] \x1b[0m";
-}
+#define INFO_LOG_STR "\x1b[38;2;3;186;252m[INFO] \x1b[0m"
 
 /*
  * Return the string "ERROR" colored with ansi escape code to appear red in 
  * error logs.
  */
-static inline char * error_log_str(){
-  return "\x1b[38;2;245;145;32m[ERROR] \x1b[0m";
-}
+#define ERROR_LOG_STR "\x1b[38;2;245;145;32m[ERROR] \x1b[0m"
 
 /*
 * Given the r,g,b values this function returns the ansi function wrapped str representation of the given 

@@ -9,6 +9,8 @@
 #include <spa/param/audio/format-utils.h>
 #include <spa/utils/defs.h>
 
+#include "logging_str.h"
+
 typedef struct{
   struct pw_main_loop *loop;
   struct pw_core *core;
@@ -29,13 +31,13 @@ void on_process(void *data){
   PW_Data *userdata=(PW_Data *)data;
   struct pw_buffer *buff;
   if ((buff=pw_stream_dequeue_buffer(userdata->stream))==NULL){
-    fprintf(stderr, "Out of input buffers for pipewire stream\n");
+    fprintf(stderr, "%sOut of input buffers for pipewire stream\n", ERROR_LOG_STR);
     return;
   }
   
   uint8_t *data_buff=buff->buffer->datas[0].data;
   if (data_buff==NULL){
-    fprintf(stderr, "There no data buffer allocated inside the pw_buffer\n");
+    fprintf(stderr, "%sThere no data buffer allocated inside the pw_buffer\n", ERROR_LOG_STR);
     return;
   }
   
@@ -55,7 +57,7 @@ void on_process(void *data){
       memset(data_buff+received_bytes, 0, required_bytes-received_bytes);
     }
   }else if (errno!=EAGAIN){
-    fprintf(stderr, "Error occured while receiving data from the pipe.Error: %s\n", strerror(errno));
+    fprintf(stderr, "%sError occured while receiving data from the pipe.Error: %s\n", ERROR_LOG_STR, strerror(errno));
     buff->buffer->datas[0].chunk->offset=0;
     buff->buffer->datas[0].chunk->stride=stride;
     buff->buffer->datas[0].chunk->size=0;
@@ -71,22 +73,26 @@ const struct pw_stream_events stream_events={
 };
 
 void init_pipewire(void *args){
-  int8_t pipe_read_fd=*(int8_t *) args;
-  fprintf(stderr, "unix pipe file descriptor: %d\n", pipe_read_fd);
   pw_init(NULL, NULL);
   
-  if ((payload.loop=pw_main_loop_new(NULL))==NULL){
-    fprintf(stderr, "Failed to acquire a pw main loop\n");
+  payload.loop=pw_main_loop_new(NULL);
+  if (payload.loop==NULL){
+    fprintf(stderr, "%sFailed to acquire a pw main loop\n", ERROR_LOG_STR);
     return;
   }
+
+  int8_t pipe_read_fd=*(int8_t *) args;
+  fprintf(stderr, "%sUnix pipe file descriptor: %d\n", INFO_LOG_STR, pipe_read_fd);
   payload.pipe_read_head=pipe_read_fd;
+
   payload.context=pw_context_new(pw_main_loop_get_loop(payload.loop),NULL, 0);
   if (payload.context==NULL){
-    fprintf(stderr, "Unable to acquire a pw context\n");
+    fprintf(stderr, "%sUnable to acquire a pw context\n", ERROR_LOG_STR);
     return;
   }
+
   if ((payload.core=pw_context_connect(payload.context, NULL, 0))==NULL){
-    fprintf(stderr, "Unable to connet to pw core deamon\n");
+    fprintf(stderr, "%sUnable to connet to pw core deamon\n", ERROR_LOG_STR);
     return;
   }
 
@@ -101,7 +107,7 @@ void init_pipewire(void *args){
       NULL)
   );
   if (payload.stream==NULL){
-    fprintf(stderr, "Unable to create a new pw_stream\n");
+    fprintf(stderr, "%sUnable to create a new pw_stream\n", ERROR_LOG_STR);
     return;
   }
   pw_stream_add_listener(payload.stream, &payload.event_listener, &stream_events, &payload);

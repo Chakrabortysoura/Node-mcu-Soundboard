@@ -29,12 +29,12 @@ void loop() {
     delay(500);
   }
   else if(digitalRead(D5)==LOW){
-    Serial.print(4);
+    Serial.print(5);
     digitalWrite(D4, LOW);
     delay(500);
   }
   else if(digitalRead(D6)==LOW){
-    Serial.print(5);
+    Serial.print(4);
     digitalWrite(D4, LOW);
     delay(500);
   }
